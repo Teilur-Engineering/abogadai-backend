@@ -1,0 +1,430 @@
+"""
+Servicio de análisis de calidad y validación de documentos legales generados con IA
+"""
+import re
+from typing import Dict, List, Tuple
+from openai import OpenAI
+from ..core.config import settings
+
+client = OpenAI(api_key=settings.OPENAI_API_KEY)
+
+
+def validar_jurisprudencia(documento: str) -> Dict:
+    """
+    Valida que la jurisprudencia citada en el documento sea real y relevante.
+
+    Busca patrones como:
+    - Sentencia T-XXX/XXXX
+    - Sentencia C-XXX/XXXX
+    - Sentencia SU-XXX/XXXX
+
+    Args:
+        documento: Texto del documento generado
+
+    Returns:
+        Dict con análisis de jurisprudencia
+    """
+
+    # Patrones de búsqueda de sentencias
+    patron_sentencia = r'(Sentencia\s+([TCS]U?)-(\d+)[/-](\d{4}))'
+    sentencias_encontradas = re.findall(patron_sentencia, documento, re.IGNORECASE)
+
+    if not sentencias_encontradas:
+        return {
+            "sentencias_citadas": [],
+            "total_sentencias": 0,
+            "advertencia": "No se encontraron citas de jurisprudencia en el documento",
+            "es_valido": True  # No es un error, pero se recomienda incluir
+        }
+
+    sentencias = []
+    for match in sentencias_encontradas:
+        sentencia_completa = match[0]
+        tipo = match[1]  # T, C, SU
+        numero = match[2]
+        año = match[3]
+
+        sentencias.append({
+            "referencia": sentencia_completa,
+            "tipo": tipo,
+            "numero": numero,
+            "año": año
+        })
+
+    # Usar GPT-4 para validar si las sentencias son reales y relevantes
+    try:
+        prompt = f"""Como experto en jurisprudencia de la Corte Constitucional de Colombia,
+analiza las siguientes sentencias citadas en un documento legal:
+
+{', '.join([s['referencia'] for s in sentencias])}
+
+Para cada sentencia:
+1. Indica si es probable que exista (basándote en el formato y año)
+2. Si conoces su contenido general, indica el tema principal
+3. Menciona si hay riesgo de que sea una "alucinación" de IA
+
+IMPORTANTE: No inventes información. Si no conoces una sentencia, indícalo claramente.
+
+Responde en formato JSON:
+{{
+    "sentencias": [
+        {{
+            "referencia": "Sentencia T-123/2020",
+            "posiblemente_real": true/false,
+            "tema_conocido": "descripción breve o 'desconocido'",
+            "riesgo_alucinacion": "bajo/medio/alto",
+            "comentario": "comentario adicional"
+        }}
+    ],
+    "recomendacion_general": "texto"
+}}
+"""
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un experto en jurisprudencia constitucional colombiana. Ayudas a validar referencias jurisprudenciales."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,  # Baja temperatura para respuestas más precisas
+            response_format={"type": "json_object"}
+        )
+
+        import json
+        validacion_gpt = json.loads(response.choices[0].message.content)
+
+        return {
+            "sentencias_citadas": sentencias,
+            "total_sentencias": len(sentencias),
+            "validacion_ia": validacion_gpt,
+            "es_valido": True,
+            "advertencia": "Verifica manualmente las sentencias citadas antes de radicar el documento"
+        }
+
+    except Exception as e:
+        return {
+            "sentencias_citadas": sentencias,
+            "total_sentencias": len(sentencias),
+            "error": f"No se pudo validar con IA: {str(e)}",
+            "es_valido": True,
+            "advertencia": "IMPORTANTE: Verifica manualmente todas las sentencias citadas"
+        }
+
+
+def analizar_calidad_documento(documento: str, datos_caso: dict) -> Dict:
+    """
+    Analiza la calidad del documento generado.
+
+    Verifica:
+    - Estructura completa
+    - Coherencia
+    - Lenguaje jurídico apropiado
+    - Inclusión de todos los datos
+
+    Args:
+        documento: Documento generado
+        datos_caso: Datos originales del caso
+
+    Returns:
+        Dict con análisis de calidad
+    """
+
+    prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente documento de acción de tutela.
+
+DOCUMENTO A ANALIZAR:
+{documento[:3000]}... (fragmento)
+
+DATOS ORIGINALES DEL CASO:
+- Solicitante: {datos_caso.get('nombre_solicitante', 'N/A')}
+- Entidad: {datos_caso.get('entidad_accionada', 'N/A')}
+- Hechos: {datos_caso.get('hechos', 'N/A')[:200]}...
+- Derechos vulnerados: {datos_caso.get('derechos_vulnerados', 'N/A')[:200]}...
+
+ANALIZA:
+1. **Estructura**: ¿Tiene todas las secciones requeridas? (Hechos, Derechos, Pretensiones, Fundamentos, etc.)
+2. **Coherencia**: ¿El documento es coherente y bien redactado?
+3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad?
+4. **Lenguaje**: ¿Usa lenguaje jurídico apropiado pero comprensible?
+5. **Fundamentos**: ¿Cita correctamente artículos constitucionales?
+6. **Completitud**: ¿El documento está listo para radicar?
+
+Responde en formato JSON:
+{{
+    "puntuacion_total": 0-100,
+    "estructura": {{"puntos": 0-20, "comentario": "texto"}},
+    "coherencia": {{"puntos": 0-20, "comentario": "texto"}},
+    "datos": {{"puntos": 0-20, "comentario": "texto"}},
+    "lenguaje": {{"puntos": 0-20, "comentario": "texto"}},
+    "fundamentos": {{"puntos": 0-10, "comentario": "texto"}},
+    "completitud": {{"puntos": 0-10, "comentario": "texto"}},
+    "problemas_encontrados": ["lista de problemas"],
+    "sugerencias_mejora": ["lista de sugerencias"],
+    "listo_para_radicar": true/false
+}}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un revisor experto de documentos legales en Colombia. Evalúas la calidad de acciones de tutela."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        )
+
+        import json
+        analisis = json.loads(response.choices[0].message.content)
+
+        return {
+            "calidad": analisis,
+            "es_valido": True
+        }
+
+    except Exception as e:
+        return {
+            "error": f"No se pudo analizar calidad: {str(e)}",
+            "es_valido": False
+        }
+
+
+def analizar_fortaleza_caso(datos_caso: dict) -> Dict:
+    """
+    Analiza la fortaleza del caso antes de generar el documento.
+
+    Evalúa:
+    - Claridad de los hechos
+    - Vulneración clara de derechos fundamentales
+    - Idoneidad del mecanismo de tutela
+    - Cumplimiento de requisitos
+
+    Args:
+        datos_caso: Datos del caso
+
+    Returns:
+        Dict con análisis de fortaleza
+    """
+
+    prompt = f"""Como abogado constitucionalista experto, analiza la fortaleza de este caso de acción de tutela ANTES de generar el documento.
+
+DATOS DEL CASO:
+
+HECHOS:
+{datos_caso.get('hechos', 'No proporcionados')}
+
+DERECHOS VULNERADOS:
+{datos_caso.get('derechos_vulnerados', 'No especificados')}
+
+PRETENSIONES:
+{datos_caso.get('pretensiones', 'No especificadas')}
+
+ENTIDAD ACCIONADA:
+{datos_caso.get('entidad_accionada', 'No especificada')}
+
+ANALIZA:
+
+1. **Procedencia de la tutela**: ¿Es el mecanismo apropiado para este caso?
+2. **Derechos fundamentales**: ¿Hay vulneración clara de derechos fundamentales?
+3. **Subsidiaridad**: ¿Se demuestra que no hay otro medio de defensa o hay perjuicio irremediable?
+4. **Legitimación**: ¿La entidad accionada es la correcta?
+5. **Hechos**: ¿Los hechos están claros y son suficientes?
+6. **Inmediatez**: ¿Los hechos son recientes? (plazo razonable)
+
+Responde en formato JSON:
+{{
+    "fortaleza_total": 0-100,
+    "probabilidad_exito": "baja/media/alta",
+    "procedencia_tutela": {{"puntos": 0-20, "comentario": "texto", "es_procedente": true/false}},
+    "derechos_fundamentales": {{"puntos": 0-20, "comentario": "texto"}},
+    "subsidiaridad": {{"puntos": 0-20, "comentario": "texto"}},
+    "legitimacion": {{"puntos": 0-15, "comentario": "texto"}},
+    "claridad_hechos": {{"puntos": 0-15, "comentario": "texto"}},
+    "inmediatez": {{"puntos": 0-10, "comentario": "texto"}},
+    "puntos_fuertes": ["lista de fortalezas del caso"],
+    "puntos_debiles": ["lista de debilidades"],
+    "recomendaciones": ["lista de recomendaciones para mejorar el caso"],
+    "advertencias": ["advertencias importantes"],
+    "debe_proceder": true/false,
+    "razon_no_proceder": "texto si no debe proceder"
+}}
+"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un abogado constitucionalista experto que evalúa la viabilidad de acciones de tutela en Colombia."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,
+            response_format={"type": "json_object"}
+        )
+
+        import json
+        analisis = json.loads(response.choices[0].message.content)
+
+        # Calcular probabilidad numérica
+        fortaleza = analisis.get('fortaleza_total', 0)
+        if fortaleza >= 80:
+            probabilidad_porcentaje = "75-90%"
+        elif fortaleza >= 60:
+            probabilidad_porcentaje = "50-75%"
+        elif fortaleza >= 40:
+            probabilidad_porcentaje = "30-50%"
+        else:
+            probabilidad_porcentaje = "10-30%"
+
+        analisis['probabilidad_porcentaje'] = probabilidad_porcentaje
+
+        return {
+            "fortaleza": analisis,
+            "es_valido": True
+        }
+
+    except Exception as e:
+        return {
+            "error": f"No se pudo analizar fortaleza: {str(e)}",
+            "es_valido": False
+        }
+
+
+def generar_sugerencias_mejora(documento: str, analisis_calidad: dict, analisis_jurisprudencia: dict) -> Dict:
+    """
+    Genera sugerencias específicas para mejorar el documento.
+
+    Args:
+        documento: Documento generado
+        analisis_calidad: Resultado del análisis de calidad
+        analisis_jurisprudencia: Resultado del análisis de jurisprudencia
+
+    Returns:
+        Dict con sugerencias de mejora
+    """
+
+    sugerencias = []
+
+    # Sugerencias basadas en calidad
+    if analisis_calidad.get('es_valido'):
+        calidad = analisis_calidad.get('calidad', {})
+
+        if calidad.get('puntuacion_total', 0) < 70:
+            sugerencias.append({
+                "categoria": "Calidad General",
+                "prioridad": "alta",
+                "descripcion": "El documento tiene una calidad inferior al 70%. Revisa las sugerencias específicas.",
+                "accion": "Revisar y mejorar el documento antes de radicar"
+            })
+
+        if calidad.get('problemas_encontrados'):
+            for problema in calidad['problemas_encontrados'][:3]:  # Top 3 problemas
+                sugerencias.append({
+                    "categoria": "Problema Detectado",
+                    "prioridad": "alta",
+                    "descripcion": problema,
+                    "accion": "Corregir antes de radicar"
+                })
+
+    # Sugerencias basadas en jurisprudencia
+    if analisis_jurisprudencia.get('es_valido'):
+        total_sentencias = analisis_jurisprudencia.get('total_sentencias', 0)
+
+        if total_sentencias == 0:
+            sugerencias.append({
+                "categoria": "Jurisprudencia",
+                "prioridad": "media",
+                "descripcion": "No se citaron sentencias de la Corte Constitucional",
+                "accion": "Considera agregar jurisprudencia relevante para fortalecer el caso"
+            })
+        elif total_sentencias > 0:
+            validacion = analisis_jurisprudencia.get('validacion_ia', {})
+            if validacion.get('sentencias'):
+                for sent in validacion['sentencias']:
+                    if sent.get('riesgo_alucinacion') == 'alto':
+                        sugerencias.append({
+                            "categoria": "Jurisprudencia",
+                            "prioridad": "crítica",
+                            "descripcion": f"Sentencia {sent['referencia']} tiene alto riesgo de ser inventada",
+                            "accion": "Verificar en bases de datos oficiales o eliminar"
+                        })
+
+    return {
+        "sugerencias": sugerencias,
+        "total_sugerencias": len(sugerencias),
+        "prioridad_critica": len([s for s in sugerencias if s['prioridad'] == 'crítica']),
+        "prioridad_alta": len([s for s in sugerencias if s['prioridad'] == 'alta']),
+        "prioridad_media": len([s for s in sugerencias if s['prioridad'] == 'media'])
+    }
+
+
+def analisis_completo_documento(documento: str, datos_caso: dict) -> Dict:
+    """
+    Realiza un análisis completo del documento generado.
+
+    Args:
+        documento: Documento generado
+        datos_caso: Datos originales del caso
+
+    Returns:
+        Dict con análisis completo
+    """
+
+    # 1. Validar jurisprudencia
+    validacion_jurisprudencia = validar_jurisprudencia(documento)
+
+    # 2. Analizar calidad
+    analisis_calidad = analizar_calidad_documento(documento, datos_caso)
+
+    # 3. Generar sugerencias
+    sugerencias = generar_sugerencias_mejora(documento, analisis_calidad, validacion_jurisprudencia)
+
+    # Determinar si el documento está listo
+    listo_para_radicar = True
+    razones_no_listo = []
+
+    if analisis_calidad.get('es_valido'):
+        calidad = analisis_calidad.get('calidad', {})
+        if calidad.get('puntuacion_total', 0) < 60:
+            listo_para_radicar = False
+            razones_no_listo.append("Calidad del documento inferior al 60%")
+
+        if not calidad.get('listo_para_radicar', True):
+            listo_para_radicar = False
+            razones_no_listo.append("El análisis de calidad indica que no está listo")
+
+    if sugerencias.get('prioridad_critica', 0) > 0:
+        listo_para_radicar = False
+        razones_no_listo.append("Hay sugerencias de prioridad crítica sin resolver")
+
+    return {
+        "jurisprudencia": validacion_jurisprudencia,
+        "calidad": analisis_calidad,
+        "sugerencias": sugerencias,
+        "listo_para_radicar": listo_para_radicar,
+        "razones_no_listo": razones_no_listo,
+        "resumen": {
+            "puntuacion_calidad": analisis_calidad.get('calidad', {}).get('puntuacion_total', 0) if analisis_calidad.get('es_valido') else 0,
+            "sentencias_citadas": validacion_jurisprudencia.get('total_sentencias', 0),
+            "sugerencias_criticas": sugerencias.get('prioridad_critica', 0),
+            "sugerencias_altas": sugerencias.get('prioridad_alta', 0),
+            "recomendacion": "Listo para radicar" if listo_para_radicar else "Requiere revisión antes de radicar"
+        }
+    }
