@@ -6,7 +6,7 @@ import logging
 
 from ..core.database import get_db
 from ..models.user import User
-from ..models.caso import Caso, EstadoCaso
+from ..models.caso import Caso, EstadoCaso, TipoDocumento
 from ..models.mensaje import Mensaje
 from ..schemas.caso import CasoCreate, CasoUpdate, CasoResponse, CasoListResponse
 from ..services import openai_service, document_service, ai_analysis_service
@@ -203,6 +203,7 @@ def procesar_transcripcion(
 
         # 🔍 LOG: Datos extraídos
         logger.info(f"✅ Datos extraídos exitosamente:")
+        logger.info(f"   Tipo documento: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
         logger.info(f"   Hechos: {'✅ Extraído' if datos_extraidos.get('hechos') else '❌ Vacío'}")
         logger.info(f"   Derechos vulnerados: {'✅ Extraído' if datos_extraidos.get('derechos_vulnerados') else '❌ Vacío'}")
         logger.info(f"   Entidad accionada: {'✅ Extraído' if datos_extraidos.get('entidad_accionada') else '❌ Vacío'}")
@@ -212,6 +213,15 @@ def procesar_transcripcion(
         # Actualizar el caso con los datos extraídos
         # Solo actualiza si el campo extraído no está vacío
         campos_actualizados = []
+
+        # Actualizar tipo_documento (siempre, basado en la detección de IA)
+        if datos_extraidos.get('tipo_documento'):
+            tipo_doc = datos_extraidos['tipo_documento']
+            if tipo_doc == 'tutela':
+                caso.tipo_documento = TipoDocumento.TUTELA
+            elif tipo_doc == 'derecho_peticion':
+                caso.tipo_documento = TipoDocumento.DERECHO_PETICION
+            campos_actualizados.append('tipo_documento')
 
         if datos_extraidos.get('hechos'):
             caso.hechos = datos_extraidos['hechos']
@@ -273,11 +283,18 @@ def analizar_fortaleza(
             detail="Caso no encontrado"
         )
 
-    # Validar datos mínimos
-    if not caso.hechos or not caso.derechos_vulnerados:
+    # Validar datos mínimos según el tipo de documento
+    if not caso.hechos:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Para analizar fortaleza se requiere: hechos y derechos vulnerados"
+            detail="Para analizar fortaleza se requiere al menos: hechos"
+        )
+
+    # Para tutelas, también se requieren derechos vulnerados
+    if caso.tipo_documento.value == "tutela" and not caso.derechos_vulnerados:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Para analizar fortaleza de una tutela se requiere: hechos y derechos vulnerados"
         )
 
     try:
@@ -289,7 +306,9 @@ def analizar_fortaleza(
             'fundamentos_derecho': caso.fundamentos_derecho or ''
         }
 
-        resultado = ai_analysis_service.analizar_fortaleza_caso(datos_caso)
+        # Pasar el tipo de documento al análisis de fortaleza
+        tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
+        resultado = ai_analysis_service.analizar_fortaleza_caso(datos_caso, tipo_documento=tipo_doc)
 
         if resultado.get('es_valido'):
             caso.analisis_fortaleza = resultado.get('fortaleza')
@@ -360,10 +379,12 @@ def generar_documento(
         caso.documento_generado = documento_generado
         caso.estado = EstadoCaso.GENERADO
 
-        # Realizar análisis completo del documento generado
+        # Realizar análisis completo del documento generado (pasando el tipo de documento)
+        tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
         analisis_completo = ai_analysis_service.analisis_completo_documento(
             documento_generado,
-            datos_caso
+            datos_caso,
+            tipo_documento=tipo_doc
         )
 
         # Guardar análisis en el caso
@@ -416,8 +437,9 @@ def descargar_pdf(
             caso.nombre_solicitante or "documento"
         )
 
-        # Nombre del archivo
-        filename = f"tutela_{caso.nombre_solicitante or 'documento'}_{caso.id}.pdf"
+        # Nombre del archivo según el tipo de documento
+        tipo_doc_nombre = "tutela" if caso.tipo_documento.value == "tutela" else "derecho_peticion"
+        filename = f"{tipo_doc_nombre}_{caso.nombre_solicitante or 'documento'}_{caso.id}.pdf"
 
         return StreamingResponse(
             pdf_buffer,
@@ -465,8 +487,9 @@ def descargar_docx(
             caso.nombre_solicitante or "documento"
         )
 
-        # Nombre del archivo
-        filename = f"tutela_{caso.nombre_solicitante or 'documento'}_{caso.id}.docx"
+        # Nombre del archivo según el tipo de documento
+        tipo_doc_nombre = "tutela" if caso.tipo_documento.value == "tutela" else "derecho_peticion"
+        filename = f"{tipo_doc_nombre}_{caso.nombre_solicitante or 'documento'}_{caso.id}.docx"
 
         return StreamingResponse(
             docx_buffer,

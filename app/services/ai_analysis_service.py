@@ -117,7 +117,7 @@ Responde en formato JSON:
         }
 
 
-def analizar_calidad_documento(documento: str, datos_caso: dict) -> Dict:
+def analizar_calidad_documento(documento: str, datos_caso: dict, tipo_documento: str = "tutela") -> Dict:
     """
     Analiza la calidad del documento generado.
 
@@ -130,26 +130,66 @@ def analizar_calidad_documento(documento: str, datos_caso: dict) -> Dict:
     Args:
         documento: Documento generado
         datos_caso: Datos originales del caso
+        tipo_documento: "tutela" o "derecho_peticion"
 
     Returns:
         Dict con análisis de calidad
     """
 
-    prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente documento de acción de tutela.
+    if tipo_documento == "derecho_peticion":
+        # Prompt específico para derechos de petición
+        prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente DERECHO DE PETICIÓN.
 
 DOCUMENTO A ANALIZAR:
 {documento[:3000]}... (fragmento)
 
 DATOS ORIGINALES DEL CASO:
 - Solicitante: {datos_caso.get('nombre_solicitante', 'N/A')}
-- Entidad: {datos_caso.get('entidad_accionada', 'N/A')}
+- Entidad destinataria: {datos_caso.get('entidad_accionada', 'N/A')}
+- Hechos: {datos_caso.get('hechos', 'N/A')[:200]}...
+- Peticiones: {datos_caso.get('pretensiones', 'N/A')[:200]}...
+
+ANALIZA SEGÚN LOS CRITERIOS DE DERECHO DE PETICIÓN:
+1. **Estructura**: ¿Tiene todas las secciones requeridas? (Objeto, Hechos, Fundamentos de Derecho, Peticiones, Notificaciones)
+2. **Coherencia**: ¿El documento es coherente y bien redactado?
+3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad destinataria?
+4. **Lenguaje**: ¿Usa lenguaje formal y respetuoso apropiado para un derecho de petición?
+5. **Fundamentos**: ¿Menciona el Art. 23 C.P. y el Código de Procedimiento Administrativo (Ley 1437)?
+6. **Peticiones claras**: ¿Las peticiones son claras, específicas y accionables?
+7. **Completitud**: ¿El documento está listo para radicar?
+
+Responde en formato JSON:
+{{
+    "puntuacion_total": 0-100,
+    "estructura": {{"puntos": 0-20, "comentario": "texto"}},
+    "coherencia": {{"puntos": 0-20, "comentario": "texto"}},
+    "datos": {{"puntos": 0-15, "comentario": "texto"}},
+    "lenguaje": {{"puntos": 0-15, "comentario": "texto"}},
+    "fundamentos": {{"puntos": 0-10, "comentario": "texto"}},
+    "peticiones_claras": {{"puntos": 0-10, "comentario": "texto"}},
+    "completitud": {{"puntos": 0-10, "comentario": "texto"}},
+    "problemas_encontrados": ["lista de problemas"],
+    "sugerencias_mejora": ["lista de sugerencias"],
+    "listo_para_radicar": true/false
+}}
+"""
+    else:
+        # Prompt específico para tutelas
+        prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente documento de ACCIÓN DE TUTELA.
+
+DOCUMENTO A ANALIZAR:
+{documento[:3000]}... (fragmento)
+
+DATOS ORIGINALES DEL CASO:
+- Solicitante: {datos_caso.get('nombre_solicitante', 'N/A')}
+- Entidad accionada: {datos_caso.get('entidad_accionada', 'N/A')}
 - Hechos: {datos_caso.get('hechos', 'N/A')[:200]}...
 - Derechos vulnerados: {datos_caso.get('derechos_vulnerados', 'N/A')[:200]}...
 
-ANALIZA:
-1. **Estructura**: ¿Tiene todas las secciones requeridas? (Hechos, Derechos, Pretensiones, Fundamentos, etc.)
+ANALIZA SEGÚN LOS CRITERIOS DE TUTELA:
+1. **Estructura**: ¿Tiene todas las secciones requeridas? (Hechos, Derechos Vulnerados, Pretensiones, Fundamentos de Derecho, Pruebas, Juramento, Notificaciones)
 2. **Coherencia**: ¿El documento es coherente y bien redactado?
-3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad?
+3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad accionada?
 4. **Lenguaje**: ¿Usa lenguaje jurídico apropiado pero comprensible?
 5. **Fundamentos**: ¿Cita correctamente artículos constitucionales?
 6. **Completitud**: ¿El documento está listo para radicar?
@@ -170,12 +210,18 @@ Responde en formato JSON:
 """
 
     try:
+        # System message según el tipo de documento
+        if tipo_documento == "derecho_peticion":
+            system_message = "Eres un revisor experto de documentos legales en Colombia. Evalúas la calidad de derechos de petición."
+        else:
+            system_message = "Eres un revisor experto de documentos legales en Colombia. Evalúas la calidad de acciones de tutela."
+
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un revisor experto de documentos legales en Colombia. Evalúas la calidad de acciones de tutela."
+                    "content": system_message
                 },
                 {
                     "role": "user",
@@ -201,24 +247,68 @@ Responde en formato JSON:
         }
 
 
-def analizar_fortaleza_caso(datos_caso: dict) -> Dict:
+def analizar_fortaleza_caso(datos_caso: dict, tipo_documento: str = "tutela") -> Dict:
     """
     Analiza la fortaleza del caso antes de generar el documento.
 
-    Evalúa:
-    - Claridad de los hechos
-    - Vulneración clara de derechos fundamentales
-    - Idoneidad del mecanismo de tutela
-    - Cumplimiento de requisitos
+    Evalúa diferentes criterios según el tipo de documento:
+    - Para tutelas: procedencia, subsidiaridad, derechos fundamentales, etc.
+    - Para derechos de petición: claridad de solicitud, competencia, legitimación, etc.
 
     Args:
         datos_caso: Datos del caso
+        tipo_documento: "tutela" o "derecho_peticion"
 
     Returns:
         Dict con análisis de fortaleza
     """
 
-    prompt = f"""Como abogado constitucionalista experto, analiza la fortaleza de este caso de acción de tutela ANTES de generar el documento.
+    if tipo_documento == "derecho_peticion":
+        prompt = f"""Como abogado experto en derecho administrativo colombiano, analiza la fortaleza de este derecho de petición ANTES de generar el documento.
+
+DATOS DEL CASO:
+
+HECHOS:
+{datos_caso.get('hechos', 'No proporcionados')}
+
+PETICIONES:
+{datos_caso.get('pretensiones', 'No especificadas')}
+
+ENTIDAD DESTINATARIA:
+{datos_caso.get('entidad_accionada', 'No especificada')}
+
+FUNDAMENTOS:
+{datos_caso.get('fundamentos_derecho', 'No especificados')}
+
+ANALIZA:
+
+1. **Claridad de la solicitud**: ¿Está claro qué se solicita a la entidad?
+2. **Legitimación del peticionario**: ¿El solicitante tiene interés legítimo?
+3. **Competencia de la entidad**: ¿Es la entidad correcta para atender esta petición?
+4. **Hechos claros**: ¿Los hechos están bien descritos y son relevantes?
+5. **Especificidad**: ¿La petición es específica y accionable?
+6. **Fundamentos**: ¿Se mencionan los fundamentos legales (Art. 23 C.P., Ley 1437)?
+
+Responde en formato JSON:
+{{
+    "fortaleza_total": 0-100,
+    "probabilidad_exito": "baja/media/alta",
+    "claridad_solicitud": {{"puntos": 0-20, "comentario": "texto"}},
+    "legitimacion": {{"puntos": 0-20, "comentario": "texto"}},
+    "competencia_entidad": {{"puntos": 0-20, "comentario": "texto"}},
+    "claridad_hechos": {{"puntos": 0-15, "comentario": "texto"}},
+    "especificidad": {{"puntos": 0-15, "comentario": "texto"}},
+    "fundamentos": {{"puntos": 0-10, "comentario": "texto"}},
+    "puntos_fuertes": ["lista de fortalezas del caso"],
+    "puntos_debiles": ["lista de debilidades"],
+    "recomendaciones": ["lista de recomendaciones para mejorar"],
+    "advertencias": ["advertencias importantes"],
+    "debe_proceder": true/false,
+    "razon_no_proceder": "texto si no debe proceder"
+}}
+"""
+    else:
+        prompt = f"""Como abogado constitucionalista experto, analiza la fortaleza de este caso de acción de tutela ANTES de generar el documento.
 
 DATOS DEL CASO:
 
@@ -263,12 +353,14 @@ Responde en formato JSON:
 """
 
     try:
+        system_message = "Eres un abogado constitucionalista experto que evalúa la viabilidad de acciones de tutela en Colombia." if tipo_documento == "tutela" else "Eres un abogado experto en derecho administrativo colombiano que evalúa la viabilidad de derechos de petición."
+
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un abogado constitucionalista experto que evalúa la viabilidad de acciones de tutela en Colombia."
+                    "content": system_message
                 },
                 {
                     "role": "user",
@@ -375,13 +467,14 @@ def generar_sugerencias_mejora(documento: str, analisis_calidad: dict, analisis_
     }
 
 
-def analisis_completo_documento(documento: str, datos_caso: dict) -> Dict:
+def analisis_completo_documento(documento: str, datos_caso: dict, tipo_documento: str = "tutela") -> Dict:
     """
     Realiza un análisis completo del documento generado.
 
     Args:
         documento: Documento generado
         datos_caso: Datos originales del caso
+        tipo_documento: "tutela" o "derecho_peticion"
 
     Returns:
         Dict con análisis completo
@@ -390,8 +483,8 @@ def analisis_completo_documento(documento: str, datos_caso: dict) -> Dict:
     # 1. Validar jurisprudencia
     validacion_jurisprudencia = validar_jurisprudencia(documento)
 
-    # 2. Analizar calidad
-    analisis_calidad = analizar_calidad_documento(documento, datos_caso)
+    # 2. Analizar calidad (pasando el tipo de documento)
+    analisis_calidad = analizar_calidad_documento(documento, datos_caso, tipo_documento)
 
     # 3. Generar sugerencias
     sugerencias = generar_sugerencias_mejora(documento, analisis_calidad, validacion_jurisprudencia)
