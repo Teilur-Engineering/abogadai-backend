@@ -6,6 +6,7 @@ from typing import List
 from ..core.database import get_db
 from ..models.user import User
 from ..models.caso import Caso, EstadoCaso
+from ..models.mensaje import Mensaje
 from ..schemas.caso import CasoCreate, CasoUpdate, CasoResponse, CasoListResponse
 from ..services import openai_service, document_service, ai_analysis_service
 from .auth import get_current_user
@@ -125,6 +126,81 @@ def eliminar_caso(
     db.commit()
 
     return None
+
+
+@router.post("/{caso_id}/procesar-transcripcion", response_model=CasoResponse)
+def procesar_transcripcion(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Procesa la transcripción de la conversación con IA y extrae datos estructurados
+    para autollenar los campos del caso (hechos, derechos vulnerados, entidad, pretensiones).
+    """
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    # Obtener todos los mensajes del caso ordenados por timestamp
+    mensajes = db.query(Mensaje).filter(
+        Mensaje.caso_id == caso_id
+    ).order_by(Mensaje.timestamp.asc()).all()
+
+    if not mensajes:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hay mensajes en este caso para procesar"
+        )
+
+    try:
+        # Convertir mensajes a formato para el servicio de IA
+        mensajes_formateados = [
+            {
+                "remitente": msg.remitente,
+                "texto": msg.texto,
+                "timestamp": str(msg.timestamp)
+            }
+            for msg in mensajes
+        ]
+
+        # Extraer datos con IA
+        datos_extraidos = openai_service.extraer_datos_conversacion(mensajes_formateados)
+
+        # Actualizar el caso con los datos extraídos
+        # Solo actualiza si el campo extraído no está vacío
+        if datos_extraidos.get('hechos'):
+            caso.hechos = datos_extraidos['hechos']
+
+        if datos_extraidos.get('derechos_vulnerados'):
+            caso.derechos_vulnerados = datos_extraidos['derechos_vulnerados']
+
+        if datos_extraidos.get('entidad_accionada'):
+            caso.entidad_accionada = datos_extraidos['entidad_accionada']
+
+        if datos_extraidos.get('pretensiones'):
+            caso.pretensiones = datos_extraidos['pretensiones']
+
+        if datos_extraidos.get('fundamentos_derecho'):
+            caso.fundamentos_derecho = datos_extraidos['fundamentos_derecho']
+
+        db.commit()
+        db.refresh(caso)
+
+        return caso
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error procesando transcripción: {str(e)}"
+        )
 
 
 @router.post("/{caso_id}/analizar-fortaleza", response_model=CasoResponse)

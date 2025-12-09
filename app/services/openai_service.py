@@ -1,5 +1,6 @@
 from openai import OpenAI
 from ..core.config import settings
+import json
 
 client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -146,3 +147,106 @@ El documento debe estar listo para ser presentado ante la entidad correspondient
 
     except Exception as e:
         raise Exception(f"Error generando derecho de petición con OpenAI: {str(e)}")
+
+
+def extraer_datos_conversacion(mensajes: list) -> dict:
+    """
+    Extrae información estructurada de una conversación entre usuario y asistente legal
+
+    Args:
+        mensajes: Lista de diccionarios con formato:
+                  [{"remitente": "usuario|asistente", "texto": "...", "timestamp": "..."}]
+
+    Returns:
+        dict con los campos extraídos: hechos, derechos_vulnerados, entidad_accionada,
+        pretensiones, fundamentos_derecho
+    """
+
+    # Construir la conversación en formato legible
+    conversacion_texto = ""
+    for msg in mensajes:
+        remitente = "ASISTENTE" if msg["remitente"] == "asistente" else "USUARIO"
+        conversacion_texto += f"{remitente}: {msg['texto']}\n\n"
+
+    prompt = f"""Eres un asistente legal experto en derecho constitucional colombiano.
+
+Analiza la siguiente conversación entre un usuario y un asistente legal que está recopilando información para crear una acción de tutela.
+
+CONVERSACIÓN:
+{conversacion_texto}
+
+TAREA:
+Extrae y estructura la siguiente información en formato JSON:
+
+1. **hechos**: Narrativa cronológica y detallada de los hechos que fundamentan la tutela.
+   Redacta en tercera persona, estilo legal, usando el nombre del solicitante si está disponible.
+   Si no hay información suficiente, deja este campo vacío.
+
+2. **derechos_vulnerados**: Lista de derechos fundamentales vulnerados con sus artículos constitucionales.
+   Formato: "Derecho a la Salud (Art. 49 C.P.), Derecho a la Vida (Art. 11 C.P.)"
+   Si no hay información suficiente, deja este campo vacío.
+
+3. **entidad_accionada**: Nombre completo de la entidad, empresa o institución que vulneró los derechos.
+   Debe ser el nombre oficial completo (ejemplo: "EPS Sanitas S.A.", "Ministerio de Salud").
+   Si no hay información suficiente, deja este campo vacío.
+
+4. **pretensiones**: Qué solicita el usuario que ordene el juez. Redacta en lenguaje legal claro.
+   Debe ser específico y accionable (ejemplo: "Ordenar a la EPS la autorización inmediata de...").
+   Si no hay información suficiente, deja este campo vacío.
+
+5. **fundamentos_derecho**: Leyes, decretos o jurisprudencia aplicable mencionada en la conversación.
+   Solo incluye lo que fue EXPLÍCITAMENTE mencionado. Si nada fue mencionado, deja este campo vacío.
+
+INSTRUCCIONES IMPORTANTES:
+- Si algún campo no tiene información suficiente en la conversación, devuélvelo como cadena vacía ""
+- Mantén lenguaje legal apropiado para Colombia
+- Redacta los hechos de forma coherente y cronológica
+- Sé preciso con los artículos constitucionales (usa "Art. XX C.P.")
+- NO inventes información que no esté en la conversación
+- NO cites jurisprudencia a menos que haya sido mencionada explícitamente
+
+FORMATO DE SALIDA:
+Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta, sin markdown ni texto adicional:
+{{
+    "hechos": "texto aquí o cadena vacía",
+    "derechos_vulnerados": "texto aquí o cadena vacía",
+    "entidad_accionada": "texto aquí o cadena vacía",
+    "pretensiones": "texto aquí o cadena vacía",
+    "fundamentos_derecho": "texto aquí o cadena vacía"
+}}"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Eres un asistente legal experto en derecho constitucional colombiano. Extraes información de conversaciones y la estructuras en formato JSON válido."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            temperature=0.3,  # Baja temperatura para mayor precisión
+            max_tokens=2000,
+            response_format={"type": "json_object"}  # Forzar respuesta JSON
+        )
+
+        resultado_texto = response.choices[0].message.content
+
+        # Parsear el JSON
+        datos_extraidos = json.loads(resultado_texto)
+
+        # Validar que tenga las claves esperadas
+        campos_esperados = ["hechos", "derechos_vulnerados", "entidad_accionada", "pretensiones", "fundamentos_derecho"]
+        for campo in campos_esperados:
+            if campo not in datos_extraidos:
+                datos_extraidos[campo] = ""
+
+        return datos_extraidos
+
+    except json.JSONDecodeError as e:
+        raise Exception(f"Error al parsear respuesta JSON de OpenAI: {str(e)}")
+    except Exception as e:
+        raise Exception(f"Error extrayendo datos de conversación con OpenAI: {str(e)}")
