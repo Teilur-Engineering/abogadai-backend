@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(git push)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(python migrate_add_pruebas_representacion.py:*)",
+      "Bash(python check_session_45.py:*)",
+      "Bash(python:*)"
+    ]
+  }
+}

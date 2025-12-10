@@ -201,14 +201,28 @@ def procesar_transcripcion(
         # Extraer datos con IA
         datos_extraidos = openai_service.extraer_datos_conversacion(mensajes_formateados)
 
-        # 🔍 LOG: Datos extraídos
-        logger.info(f"✅ Datos extraídos exitosamente:")
+        # 🔍 LOG: Datos extraídos completos (para debugging)
+        logger.info(f"✅ Datos extraídos exitosamente - DUMP COMPLETO:")
+        import json
+        logger.info(json.dumps(datos_extraidos, indent=2, ensure_ascii=False))
+
+        # 🔍 LOG: Resumen de datos extraídos
+        logger.info(f"\n📊 RESUMEN DE EXTRACCIÓN:")
         logger.info(f"   Tipo documento: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
+        logger.info(f"   Nombre solicitante: {'✅ ' + datos_extraidos.get('nombre_solicitante', '')[:30] if datos_extraidos.get('nombre_solicitante') else '❌ Vacío'}")
+        logger.info(f"   Identificación: {'✅ ' + str(datos_extraidos.get('identificacion_solicitante', '')) if datos_extraidos.get('identificacion_solicitante') else '❌ Vacío'}")
+        logger.info(f"   Dirección: {'✅ Extraído' if datos_extraidos.get('direccion_solicitante') else '❌ Vacío'}")
+        logger.info(f"   Teléfono: {'✅ ' + str(datos_extraidos.get('telefono_solicitante', '')) if datos_extraidos.get('telefono_solicitante') else '❌ Vacío'}")
+        logger.info(f"   Email: {'✅ ' + str(datos_extraidos.get('email_solicitante', '')) if datos_extraidos.get('email_solicitante') else '❌ Vacío'}")
         logger.info(f"   Hechos: {'✅ Extraído' if datos_extraidos.get('hechos') else '❌ Vacío'}")
         logger.info(f"   Derechos vulnerados: {'✅ Extraído' if datos_extraidos.get('derechos_vulnerados') else '❌ Vacío'}")
-        logger.info(f"   Entidad accionada: {'✅ Extraído' if datos_extraidos.get('entidad_accionada') else '❌ Vacío'}")
+        logger.info(f"   Entidad accionada: {'✅ ' + str(datos_extraidos.get('entidad_accionada', '')) if datos_extraidos.get('entidad_accionada') else '❌ Vacío'}")
+        logger.info(f"   Dirección entidad: {'✅ Extraído' if datos_extraidos.get('direccion_entidad') else '❌ Vacío'}")
         logger.info(f"   Pretensiones: {'✅ Extraído' if datos_extraidos.get('pretensiones') else '❌ Vacío'}")
         logger.info(f"   Fundamentos: {'✅ Extraído' if datos_extraidos.get('fundamentos_derecho') else '❌ Vacío'}")
+        logger.info(f"   Pruebas: {'✅ Extraído' if datos_extraidos.get('pruebas') else '❌ Vacío'}")
+        logger.info(f"   Actúa en representación: {datos_extraidos.get('actua_en_representacion', False)}")
+        logger.info(f"   Hubo derecho petición previo: {datos_extraidos.get('hubo_derecho_peticion_previo', False)}")
 
         # Actualizar el caso con los datos extraídos
         # Solo actualiza si el campo extraído no está vacío
@@ -243,8 +257,64 @@ def procesar_transcripcion(
             caso.fundamentos_derecho = datos_extraidos['fundamentos_derecho']
             campos_actualizados.append('fundamentos_derecho')
 
+        # 🆕 DATOS DEL SOLICITANTE (nuevos campos)
+        if datos_extraidos.get('nombre_solicitante'):
+            caso.nombre_solicitante = datos_extraidos['nombre_solicitante']
+            campos_actualizados.append('nombre_solicitante')
+
+        if datos_extraidos.get('identificacion_solicitante'):
+            caso.identificacion_solicitante = datos_extraidos['identificacion_solicitante']
+            campos_actualizados.append('identificacion_solicitante')
+
+        if datos_extraidos.get('direccion_solicitante'):
+            caso.direccion_solicitante = datos_extraidos['direccion_solicitante']
+            campos_actualizados.append('direccion_solicitante')
+
+        if datos_extraidos.get('telefono_solicitante'):
+            caso.telefono_solicitante = datos_extraidos['telefono_solicitante']
+            campos_actualizados.append('telefono_solicitante')
+
+        if datos_extraidos.get('email_solicitante'):
+            caso.email_solicitante = datos_extraidos['email_solicitante']
+            campos_actualizados.append('email_solicitante')
+
+        # 🆕 DATOS DE LA ENTIDAD (campos adicionales)
+        if datos_extraidos.get('direccion_entidad'):
+            caso.direccion_entidad = datos_extraidos['direccion_entidad']
+            campos_actualizados.append('direccion_entidad')
+
+        if datos_extraidos.get('representante_legal'):
+            caso.representante_legal = datos_extraidos['representante_legal']
+            campos_actualizados.append('representante_legal')
+
+        # 🆕 PRUEBAS
+        if datos_extraidos.get('pruebas'):
+            caso.pruebas = datos_extraidos['pruebas']
+            campos_actualizados.append('pruebas')
+
+        # 🆕 REPRESENTACIÓN (campos booleanos y de representación)
+        if 'actua_en_representacion' in datos_extraidos:
+            caso.actua_en_representacion = datos_extraidos['actua_en_representacion']
+            campos_actualizados.append('actua_en_representacion')
+
+        if datos_extraidos.get('nombre_representado'):
+            caso.nombre_representado = datos_extraidos['nombre_representado']
+            campos_actualizados.append('nombre_representado')
+
+        if datos_extraidos.get('identificacion_representado'):
+            caso.identificacion_representado = datos_extraidos['identificacion_representado']
+            campos_actualizados.append('identificacion_representado')
+
+        if datos_extraidos.get('relacion_representado'):
+            caso.relacion_representado = datos_extraidos['relacion_representado']
+            campos_actualizados.append('relacion_representado')
+
+        if datos_extraidos.get('tipo_representado'):
+            caso.tipo_representado = datos_extraidos['tipo_representado']
+            campos_actualizados.append('tipo_representado')
+
         logger.info(f"💾 Guardando cambios en la base de datos...")
-        logger.info(f"   Campos actualizados: {', '.join(campos_actualizados) if campos_actualizados else 'Ninguno'}")
+        logger.info(f"   Campos actualizados ({len(campos_actualizados)}): {', '.join(campos_actualizados) if campos_actualizados else 'Ninguno'}")
 
         db.commit()
         db.refresh(caso)
@@ -360,6 +430,11 @@ def generar_documento(
             'direccion_solicitante': caso.direccion_solicitante,
             'telefono_solicitante': caso.telefono_solicitante,
             'email_solicitante': caso.email_solicitante,
+            'actua_en_representacion': caso.actua_en_representacion,
+            'nombre_representado': caso.nombre_representado,
+            'identificacion_representado': caso.identificacion_representado,
+            'relacion_representado': caso.relacion_representado,
+            'tipo_representado': caso.tipo_representado,
             'entidad_accionada': caso.entidad_accionada,
             'direccion_entidad': caso.direccion_entidad,
             'representante_legal': caso.representante_legal,
@@ -367,6 +442,7 @@ def generar_documento(
             'derechos_vulnerados': caso.derechos_vulnerados,
             'pretensiones': caso.pretensiones,
             'fundamentos_derecho': caso.fundamentos_derecho,
+            'pruebas': caso.pruebas,
         }
 
         # Generar documento según el tipo

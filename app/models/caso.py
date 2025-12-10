@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum, JSON
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Enum as SQLEnum, JSON, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import enum
@@ -34,6 +34,13 @@ class Caso(Base):
     telefono_solicitante = Column(String(50), nullable=True)
     email_solicitante = Column(String(200), nullable=True)
 
+    # Representación de terceros
+    actua_en_representacion = Column(Boolean, default=False, nullable=False)
+    nombre_representado = Column(String(200), nullable=True)
+    identificacion_representado = Column(String(50), nullable=True)
+    relacion_representado = Column(String(100), nullable=True)  # madre, padre, cuidador, apoderado, etc.
+    tipo_representado = Column(String(100), nullable=True)  # menor, adulto_mayor, persona_discapacidad, etc.
+
     # Datos de la entidad accionada
     entidad_accionada = Column(String(200), nullable=True)
     direccion_entidad = Column(Text, nullable=True)
@@ -44,6 +51,7 @@ class Caso(Base):
     derechos_vulnerados = Column(Text, nullable=True)
     pretensiones = Column(Text, nullable=True)
     fundamentos_derecho = Column(Text, nullable=True)
+    pruebas = Column(Text, nullable=True)  # Documentos y pruebas anexas
 
     # Documento generado
     documento_generado = Column(Text, nullable=True)

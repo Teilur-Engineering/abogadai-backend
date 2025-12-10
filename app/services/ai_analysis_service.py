@@ -141,7 +141,7 @@ def analizar_calidad_documento(documento: str, datos_caso: dict, tipo_documento:
         prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente DERECHO DE PETICIÓN.
 
 DOCUMENTO A ANALIZAR:
-{documento[:3000]}... (fragmento)
+{documento[:12000]}
 
 DATOS ORIGINALES DEL CASO:
 - Solicitante: {datos_caso.get('nombre_solicitante', 'N/A')}
@@ -150,23 +150,29 @@ DATOS ORIGINALES DEL CASO:
 - Peticiones: {datos_caso.get('pretensiones', 'N/A')[:200]}...
 
 ANALIZA SEGÚN LOS CRITERIOS DE DERECHO DE PETICIÓN:
-1. **Estructura**: ¿Tiene todas las secciones requeridas? (Objeto, Hechos, Fundamentos de Derecho, Peticiones, Notificaciones)
+1. **Estructura**: ¿Tiene todas las secciones requeridas? (Objeto, Hechos, Fundamentos de Derecho, Peticiones, Anexos si aplica, Notificaciones)
 2. **Coherencia**: ¿El documento es coherente y bien redactado?
 3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad destinataria?
 4. **Lenguaje**: ¿Usa lenguaje formal y respetuoso apropiado para un derecho de petición?
-5. **Fundamentos**: ¿Menciona el Art. 23 C.P. y el Código de Procedimiento Administrativo (Ley 1437)?
-6. **Peticiones claras**: ¿Las peticiones son claras, específicas y accionables?
+5. **Fundamentos jurídicos**:
+   - ¿Cita el Art. 23 C.P. y la Ley 1437 de 2011?
+   - ¿Menciona el término de 15 días hábiles (Art. 14 Ley 1437)?
+   - Si aplica, ¿cita normas especiales para sujetos de protección (menores Art. 44, adultos mayores Art. 46, personas con discapacidad Art. 47)?
+6. **Peticiones numeradas y claras**:
+   - ¿Las peticiones están numeradas (PRIMERO, SEGUNDO, TERCERO, etc.)?
+   - ¿Son claras, específicas y accionables?
+   - ¿Cada petición responde a una necesidad concreta?
 7. **Completitud**: ¿El documento está listo para radicar?
 
 Responde en formato JSON:
 {{
     "puntuacion_total": 0-100,
-    "estructura": {{"puntos": 0-20, "comentario": "texto"}},
-    "coherencia": {{"puntos": 0-20, "comentario": "texto"}},
+    "estructura": {{"puntos": 0-15, "comentario": "texto"}},
+    "coherencia": {{"puntos": 0-15, "comentario": "texto"}},
     "datos": {{"puntos": 0-15, "comentario": "texto"}},
     "lenguaje": {{"puntos": 0-15, "comentario": "texto"}},
-    "fundamentos": {{"puntos": 0-10, "comentario": "texto"}},
-    "peticiones_claras": {{"puntos": 0-10, "comentario": "texto"}},
+    "fundamentos_juridicos": {{"puntos": 0-15, "comentario": "texto", "cita_art23": true/false, "cita_ley1437": true/false, "menciona_plazo_15dias": true/false}},
+    "peticiones_numeradas": {{"puntos": 0-15, "comentario": "texto", "estan_numeradas": true/false, "son_especificas": true/false}},
     "completitud": {{"puntos": 0-10, "comentario": "texto"}},
     "problemas_encontrados": ["lista de problemas"],
     "sugerencias_mejora": ["lista de sugerencias"],
@@ -178,7 +184,7 @@ Responde en formato JSON:
         prompt = f"""Como revisor experto de documentos legales colombianos, analiza la calidad del siguiente documento de ACCIÓN DE TUTELA.
 
 DOCUMENTO A ANALIZAR:
-{documento[:3000]}... (fragmento)
+{documento[:12000]}
 
 DATOS ORIGINALES DEL CASO:
 - Solicitante: {datos_caso.get('nombre_solicitante', 'N/A')}
@@ -187,21 +193,25 @@ DATOS ORIGINALES DEL CASO:
 - Derechos vulnerados: {datos_caso.get('derechos_vulnerados', 'N/A')[:200]}...
 
 ANALIZA SEGÚN LOS CRITERIOS DE TUTELA:
-1. **Estructura**: ¿Tiene todas las secciones requeridas? (Hechos, Derechos Vulnerados, Pretensiones, Fundamentos de Derecho, Pruebas, Juramento, Notificaciones)
+1. **Estructura**: ¿Tiene todas las secciones requeridas? (Hechos, Derechos Vulnerados, Pretensiones, Fundamentos de Derecho, Procedencia y Legitimidad, Inexistencia de Otro Mecanismo Idóneo, Pruebas, Juramento, Notificaciones)
 2. **Coherencia**: ¿El documento es coherente y bien redactado?
 3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad accionada?
 4. **Lenguaje**: ¿Usa lenguaje jurídico apropiado pero comprensible?
-5. **Fundamentos**: ¿Cita correctamente artículos constitucionales?
-6. **Completitud**: ¿El documento está listo para radicar?
+5. **Fundamentos**: ¿Cita correctamente artículos constitucionales y el Decreto 2591 de 1991?
+6. **Procedencia**: ¿La sección de Procedencia y Legitimidad demuestra claramente por qué la tutela es procedente?
+7. **Subsidiariedad**: ¿La sección de Inexistencia de Otro Mecanismo Idóneo explica adecuadamente por qué no hay otro medio de defensa o se agotaron los existentes?
+8. **Completitud**: ¿El documento está listo para radicar?
 
 Responde en formato JSON:
 {{
     "puntuacion_total": 0-100,
-    "estructura": {{"puntos": 0-20, "comentario": "texto"}},
-    "coherencia": {{"puntos": 0-20, "comentario": "texto"}},
-    "datos": {{"puntos": 0-20, "comentario": "texto"}},
-    "lenguaje": {{"puntos": 0-20, "comentario": "texto"}},
+    "estructura": {{"puntos": 0-15, "comentario": "texto"}},
+    "coherencia": {{"puntos": 0-15, "comentario": "texto"}},
+    "datos": {{"puntos": 0-15, "comentario": "texto"}},
+    "lenguaje": {{"puntos": 0-15, "comentario": "texto"}},
     "fundamentos": {{"puntos": 0-10, "comentario": "texto"}},
+    "procedencia": {{"puntos": 0-10, "comentario": "texto"}},
+    "subsidiariedad": {{"puntos": 0-10, "comentario": "texto"}},
     "completitud": {{"puntos": 0-10, "comentario": "texto"}},
     "problemas_encontrados": ["lista de problemas"],
     "sugerencias_mejora": ["lista de sugerencias"],
@@ -324,6 +334,12 @@ PRETENSIONES:
 ENTIDAD ACCIONADA:
 {datos_caso.get('entidad_accionada', 'No especificada')}
 
+IMPORTANTE - VERIFICAR TIPO DE DOCUMENTO CORRECTO:
+Antes de analizar, evalúa si TUTELA es el mecanismo apropiado o si debería ser DERECHO DE PETICIÓN:
+- Si NO hubo derecho de petición previo Y no hay urgencia extrema → debería ser DERECHO DE PETICIÓN primero
+- Si YA hubo derecho de petición Y (no respondieron O negaron O no resolvieron) → TUTELA es apropiada
+- Si hay urgencia extrema o perjuicio irremediable → TUTELA es apropiada directamente
+
 ANALIZA:
 
 1. **Procedencia de la tutela**: ¿Es el mecanismo apropiado para este caso?
@@ -337,6 +353,9 @@ Responde en formato JSON:
 {{
     "fortaleza_total": 0-100,
     "probabilidad_exito": "baja/media/alta",
+    "es_tipo_documento_correcto": true/false,
+    "sugerencia_tipo_documento": "tutela o derecho_peticion si es_tipo_documento_correcto es false",
+    "razon_sugerencia": "explicación de por qué debería ser otro tipo de documento, si aplica",
     "procedencia_tutela": {{"puntos": 0-20, "comentario": "texto", "es_procedente": true/false}},
     "derechos_fundamentales": {{"puntos": 0-20, "comentario": "texto"}},
     "subsidiaridad": {{"puntos": 0-20, "comentario": "texto"}},

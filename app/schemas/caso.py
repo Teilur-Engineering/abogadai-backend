@@ -28,6 +28,11 @@ class CasoBase(BaseModel):
     direccion_solicitante: Optional[str] = None
     telefono_solicitante: Optional[str] = None
     email_solicitante: Optional[str] = None
+    actua_en_representacion: bool = False
+    nombre_representado: Optional[str] = None
+    identificacion_representado: Optional[str] = None
+    relacion_representado: Optional[str] = None
+    tipo_representado: Optional[str] = None
     entidad_accionada: Optional[str] = None
     direccion_entidad: Optional[str] = None
     representante_legal: Optional[str] = None
@@ -35,6 +40,7 @@ class CasoBase(BaseModel):
     derechos_vulnerados: Optional[str] = None
     pretensiones: Optional[str] = None
     fundamentos_derecho: Optional[str] = None
+    pruebas: Optional[str] = None
 
     @field_validator('identificacion_solicitante')
     @classmethod
@@ -96,6 +102,11 @@ class CasoUpdate(BaseModel):
     direccion_solicitante: Optional[str] = None
     telefono_solicitante: Optional[str] = None
     email_solicitante: Optional[str] = None
+    actua_en_representacion: Optional[bool] = None
+    nombre_representado: Optional[str] = None
+    identificacion_representado: Optional[str] = None
+    relacion_representado: Optional[str] = None
+    tipo_representado: Optional[str] = None
     entidad_accionada: Optional[str] = None
     direccion_entidad: Optional[str] = None
     representante_legal: Optional[str] = None
@@ -103,6 +114,7 @@ class CasoUpdate(BaseModel):
     derechos_vulnerados: Optional[str] = None
     pretensiones: Optional[str] = None
     fundamentos_derecho: Optional[str] = None
+    pruebas: Optional[str] = None
     estado: Optional[EstadoCasoEnum] = None
     documento_generado: Optional[str] = None
 
