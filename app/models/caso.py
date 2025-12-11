@@ -15,6 +15,7 @@ class EstadoCaso(str, enum.Enum):
     BORRADOR = "borrador"
     GENERADO = "generado"
     FINALIZADO = "finalizado"
+    ABANDONADO = "abandonado"
 
 
 class Caso(Base):

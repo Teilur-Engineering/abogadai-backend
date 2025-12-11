@@ -31,19 +31,18 @@ async def get_livekit_token(
 
     try:
         # 1. Crear nuevo caso (igual que /sesiones/iniciar)
-        room_name = f"caso-{uuid.uuid4().hex[:12]}"
         session_id = str(uuid.uuid4())
 
         logger.info(f"📦 Creando nuevo caso...")
-        logger.info(f"   Room name: {room_name}")
         logger.info(f"   Session ID: {session_id}")
 
+        # Crear caso sin room_name primero para obtener el ID
         nuevo_caso = Caso(
             user_id=current_user.id,
             tipo_documento=TipoDocumento.TUTELA,
             estado=EstadoCaso.BORRADOR,
             session_id=session_id,
-            room_name=room_name,
+            room_name=None,  # Se asignará después de obtener el ID
             fecha_inicio_sesion=datetime.utcnow(),
             nombre_solicitante=f"{current_user.nombre} {current_user.apellido}",
             email_solicitante=current_user.email
@@ -53,7 +52,14 @@ async def get_livekit_token(
         db.commit()
         db.refresh(nuevo_caso)
 
+        # Ahora que tenemos el ID, crear el room_name con el caso_id numérico
+        room_name = f"caso-{nuevo_caso.id}"
+        nuevo_caso.room_name = room_name
+        db.commit()
+        db.refresh(nuevo_caso)
+
         logger.info(f"✅ Caso creado exitosamente - ID: {nuevo_caso.id}")
+        logger.info(f"   Room name: {room_name} (incluye caso_id para extracción)")
 
         # 2. Generar token de LiveKit
         logger.info(f"🎫 Generando token de LiveKit...")

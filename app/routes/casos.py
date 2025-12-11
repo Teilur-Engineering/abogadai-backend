@@ -210,35 +210,25 @@ def procesar_transcripcion(
     logger.info(f"📊 Mensajes encontrados: {len(mensajes)}")
 
     if not mensajes:
-        logger.error(f"❌❌❌ NO HAY MENSAJES EN EL CASO {caso_id} ❌❌❌")
-        logger.error(f"   DIAGNÓSTICO:")
-        logger.error(f"   1. ¿Se guardaron los mensajes durante la sesión?")
-        logger.error(f"   2. Revisar logs del AGENTE de LiveKit")
-        logger.error(f"   3. Buscar logs '💾 Intentando guardar mensaje...'")
-        logger.error(f"   4. Buscar logs '✅ MENSAJE GUARDADO EXITOSAMENTE'")
-        logger.error(f"   5. Verificar que caso_id sea {caso_id} en los logs del agente")
+        logger.warning(f"⚠️ NO HAY MENSAJES EN EL CASO {caso_id}")
+        logger.warning(f"   Room name: {caso.room_name}")
+        logger.warning(f"   Estado actual: {caso.estado}")
+        logger.warning(f"   Fecha inicio: {caso.fecha_inicio_sesion}")
+        logger.warning(f"   Marcando caso como ABANDONADO...")
 
-        # Consultar información adicional del caso para debugging
-        logger.error(f"\n   📋 INFO DEL CASO:")
-        logger.error(f"      Caso ID: {caso.id}")
-        logger.error(f"      User ID: {caso.user_id}")
-        logger.error(f"      Room name: {caso.room_name}")
-        logger.error(f"      Estado: {caso.estado}")
-        logger.error(f"      Fecha inicio sesión: {caso.fecha_inicio_sesion}")
+        # Marcar el caso como abandonado
+        caso.estado = EstadoCaso.ABANDONADO
+        db.commit()
 
-        # Intentar contar TODOS los mensajes en la BD (debug)
-        total_mensajes = db.query(Mensaje).count()
-        logger.error(f"   📊 Total mensajes en TODA la BD: {total_mensajes}")
-
-        # Ver si hay mensajes de otros casos (debug)
-        if total_mensajes > 0:
-            ultimos_casos = db.query(Mensaje.caso_id).distinct().limit(5).all()
-            casos_con_mensajes = [c[0] for c in ultimos_casos]
-            logger.error(f"   📋 Casos que SÍ tienen mensajes: {casos_con_mensajes}")
+        logger.info(f"✅ Caso {caso_id} marcado como ABANDONADO")
+        logger.info(f"   Revisar logs del AGENTE para diagnóstico:")
+        logger.info(f"   - Buscar '✅ caso_id EXTRAÍDO EXITOSAMENTE'")
+        logger.info(f"   - Buscar '💾 Guardando mensaje'")
+        logger.info(f"   - Buscar '✅ Mensaje guardado'")
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No hay mensajes en este caso para procesar"
+            detail="Sesión abandonada sin mensajes. Revisa los logs del agente."
         )
 
     # 🔍 LOG: Detalles de los mensajes
