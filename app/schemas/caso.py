@@ -1,13 +1,7 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
-from ..core.validators import (
-    validar_cedula_colombiana,
-    validar_nit_colombiano,
-    validar_telefono_colombiano,
-    validar_email
-)
 
 
 class TipoDocumentoEnum(str, Enum):
@@ -22,6 +16,11 @@ class EstadoCasoEnum(str, Enum):
 
 
 class CasoBase(BaseModel):
+    """
+    Schema base para casos - SIN validaciones estrictas.
+    Las validaciones se hacen SOLO al momento de generar el documento.
+    Esto permite guardar cualquier dato de la transcripción y que el usuario corrija en el formulario.
+    """
     tipo_documento: TipoDocumentoEnum = TipoDocumentoEnum.TUTELA
     nombre_solicitante: Optional[str] = None
     identificacion_solicitante: Optional[str] = None
@@ -41,54 +40,6 @@ class CasoBase(BaseModel):
     pretensiones: Optional[str] = None
     fundamentos_derecho: Optional[str] = None
     pruebas: Optional[str] = None
-
-    @field_validator('identificacion_solicitante')
-    @classmethod
-    def validar_identificacion(cls, v: Optional[str]) -> Optional[str]:
-        """Valida que la identificación sea una cédula o NIT válido"""
-        if v is None or v.strip() == "":
-            return v
-
-        # Intentar validar como cédula primero
-        if validar_cedula_colombiana(v):
-            return v
-
-        # Si no es cédula, intentar como NIT
-        if validar_nit_colombiano(v):
-            return v
-
-        # Si no es ninguno, lanzar error
-        raise ValueError(
-            'La identificación debe ser una cédula colombiana válida (6-10 dígitos) '
-            'o un NIT válido (formato: XXXXXXXXX-X)'
-        )
-
-    @field_validator('telefono_solicitante')
-    @classmethod
-    def validar_telefono(cls, v: Optional[str]) -> Optional[str]:
-        """Valida que el teléfono tenga formato colombiano"""
-        if v is None or v.strip() == "":
-            return v
-
-        if not validar_telefono_colombiano(v):
-            raise ValueError(
-                'El teléfono debe ser un número colombiano válido '
-                '(7 dígitos para fijo o 10 para celular)'
-            )
-
-        return v
-
-    @field_validator('email_solicitante')
-    @classmethod
-    def validar_email_solicitante(cls, v: Optional[str]) -> Optional[str]:
-        """Valida que el email tenga formato válido"""
-        if v is None or v.strip() == "":
-            return v
-
-        if not validar_email(v):
-            raise ValueError('El email no tiene un formato válido')
-
-        return v
 
 
 class CasoCreate(CasoBase):

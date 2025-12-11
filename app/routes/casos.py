@@ -130,6 +130,41 @@ def eliminar_caso(
     return None
 
 
+@router.post("/{caso_id}/validar")
+def validar_caso(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Valida los campos del caso y retorna errores y advertencias
+    sin bloquear el guardado. El frontend usa esto para mostrar
+    validaciones visuales en tiempo real.
+    """
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    from ..core.validation_helper import validar_caso_completo
+
+    tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
+    resultado_validacion = validar_caso_completo(caso, tipo_doc)
+
+    return {
+        "caso_id": caso_id,
+        "valido": resultado_validacion["valido"],
+        "errores": resultado_validacion["errores"],
+        "advertencias": resultado_validacion["advertencias"]
+    }
+
+
 @router.post("/{caso_id}/procesar-transcripcion", response_model=CasoResponse)
 def procesar_transcripcion(
     caso_id: int,
@@ -403,6 +438,9 @@ def generar_documento(
     """
     Genera el documento legal usando GPT-4 basado en los datos del caso.
     Incluye análisis automático de calidad y jurisprudencia.
+
+    VALIDACIÓN ESTRICTA: Este endpoint valida que todos los campos críticos
+    estén completos y con formato válido antes de generar el documento.
     """
     caso = db.query(Caso).filter(
         Caso.id == caso_id,
@@ -415,11 +453,21 @@ def generar_documento(
             detail="Caso no encontrado"
         )
 
-    # Validar que tenga los datos mínimos requeridos
-    if not caso.nombre_solicitante or not caso.entidad_accionada or not caso.hechos:
+    # 🔍 VALIDACIÓN ESTRICTA: Validar campos críticos según tipo de documento
+    from ..core.validation_helper import validar_caso_completo
+
+    tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
+    resultado_validacion = validar_caso_completo(caso, tipo_doc)
+
+    if not resultado_validacion["valido"]:
+        # Retornar errores detallados para que el frontend los muestre
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="El caso debe tener al menos: nombre del solicitante, entidad accionada y hechos"
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "message": "El caso tiene errores que deben corregirse antes de generar el documento",
+                "errores": resultado_validacion["errores"],
+                "advertencias": resultado_validacion["advertencias"]
+            }
         )
 
     try:

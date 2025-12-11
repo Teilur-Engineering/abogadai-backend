@@ -285,8 +285,20 @@ Busca activamente en la conversación:
 
 3. **identificacion_solicitante**: El número de cédula o documento de identidad.
    Busca cuando dice: "mi cédula es...", "mi documento es...", "mi número de identificación es...".
-   Convierte números en palabras a dígitos (ej: "cincuenta y dos punto trescientos cuarenta y cinco punto sesenta y ocho" → "52345678").
-   Remueve puntos y espacios, solo dígitos.
+
+   NORMALIZACIÓN CRÍTICA - Convierte a SOLO DÍGITOS sin separadores:
+   - Números en palabras → dígitos: "cincuenta y dos millones trescientos cuarenta y cinco mil seiscientos setenta y ocho" → "52345678"
+   - Con puntos → sin puntos: "52.345.678" → "52345678"
+   - Con guiones → sin guiones: "52-345-678" → "52345678"
+   - Con espacios → sin espacios: "52 345 678" → "52345678"
+   - Con comas → sin comas: "52,345,678" → "52345678"
+
+   Ejemplos de transcripción y normalización:
+   - Usuario dice: "uno dos tres cuatro cinco seis siete ocho" → Extraes: "12345678"
+   - Usuario dice: "cincuenta y dos punto trescientos cuarenta y cinco punto seiscientos setenta y ocho" → Extraes: "52345678"
+   - Usuario dice: "mil doscientos treinta y cuatro cinco seis siete ocho" → Extraes: "12345678"
+   - Usuario dice: "es el uno punto dos punto tres punto cuatro" → Extraes: "1234"
+
    Si no lo menciona, deja este campo vacío.
 
 4. **direccion_solicitante**: La dirección completa del solicitante para notificaciones.
@@ -296,7 +308,18 @@ Busca activamente en la conversación:
 
 5. **telefono_solicitante**: El número de teléfono o celular del solicitante.
    Busca cuando dice: "mi teléfono es...", "mi celular es...", "mi número es...".
-   Convierte a dígitos sin espacios ni guiones (ej: "300-123-456" → "300123456").
+
+   NORMALIZACIÓN CRÍTICA - Convierte a SOLO DÍGITOS sin separadores:
+   - Números en palabras → dígitos: "tres cero cero uno dos tres cuatro cinco seis siete" → "3001234567"
+   - Con guiones → sin guiones: "300-123-4567" → "3001234567"
+   - Con espacios → sin espacios: "300 123 4567" → "3001234567"
+   - Con paréntesis → sin paréntesis: "(300) 123-4567" → "3001234567"
+
+   Ejemplos de transcripción y normalización:
+   - Usuario dice: "tres cero cero uno dos tres cuatro cinco seis siete" → Extraes: "3001234567"
+   - Usuario dice: "es el 300 123 4567" → Extraes: "3001234567"
+   - Usuario dice: "trescientos cero uno dos tres cuatro cinco seis siete" → Extraes: "3001234567"
+
    Si no lo menciona, deja este campo vacío.
 
 6. **email_solicitante**: El correo electrónico del solicitante.
