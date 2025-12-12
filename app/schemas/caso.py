@@ -13,6 +13,7 @@ class EstadoCasoEnum(str, Enum):
     BORRADOR = "borrador"
     GENERADO = "generado"
     FINALIZADO = "finalizado"
+    ABANDONADO = "abandonado"
 
 
 class CasoBase(BaseModel):
