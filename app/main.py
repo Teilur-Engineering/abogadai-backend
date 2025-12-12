@@ -14,15 +14,16 @@ app = FastAPI(
 )
 
 # Configurar CORS
-# En producción, FRONTEND_URL vendrá de las variables de entorno
-# En desarrollo local, también permitimos localhost
-allowed_origins = [settings.FRONTEND_URL]
+# Permitir frontend de producción y desarrollo
+allowed_origins = [
+    settings.FRONTEND_URL,  # De .env (localhost en dev)
+    "https://abogadai-frontend.onrender.com",  # Producción
+    "http://localhost:5173",  # Desarrollo local
+    "http://localhost:3000",  # Desarrollo alternativo
+]
 
-# Agregar orígenes de desarrollo si no están ya incluidos
-dev_origins = ["http://localhost:5173", "http://localhost:3000"]
-for origin in dev_origins:
-    if origin not in allowed_origins:
-        allowed_origins.append(origin)
+# Remover duplicados
+allowed_origins = list(set(allowed_origins))
 
 app.add_middleware(
     CORSMiddleware,
