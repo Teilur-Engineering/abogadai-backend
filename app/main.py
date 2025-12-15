@@ -5,7 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routes import auth, livekit, casos, referencias, sesiones, mensajes
+from app.routes import auth, livekit, casos, referencias, sesiones, mensajes, perfil
 import logging
 
 # Configurar logging
@@ -90,8 +90,9 @@ app.include_router(auth.router)
 app.include_router(livekit.router)
 app.include_router(casos.router)
 app.include_router(referencias.router)
-app.include_router(sesiones.router)  # NUEVO
-app.include_router(mensajes.router)  # NUEVO
+app.include_router(sesiones.router)
+app.include_router(mensajes.router)
+app.include_router(perfil.router, prefix="/api")
 
 
 @app.get("/")

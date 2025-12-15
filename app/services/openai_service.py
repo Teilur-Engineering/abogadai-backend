@@ -247,15 +247,22 @@ CONVERSACIÓN:
 {conversacion_texto}
 
 TAREA:
-Extrae y estructura la siguiente información en formato JSON. LEE CUIDADOSAMENTE toda la conversación y extrae TODOS los datos mencionados, especialmente los datos personales del solicitante.
+Extrae y estructura la siguiente información en formato JSON. LEE CUIDADOSAMENTE toda la conversación y extrae los datos del caso.
 
 IMPORTANTE - DATOS PERSONALES DEL SOLICITANTE:
-Busca activamente en la conversación:
-- El nombre completo del solicitante (cuando dice "me llamo...", "mi nombre es...", "soy...")
-- Su número de cédula o documento (cuando dice "mi cédula es...", "mi documento es...")
-- Su dirección completa (cuando dice "vivo en...", "mi dirección es...", "mi dirección completa es...")
-- Su número de teléfono (cuando dice "mi teléfono es...", "mi celular es...")
-- Su correo electrónico (cuando dice "mi correo es...", "mi email es...")
+Los datos personales del solicitante (nombre, identificación, dirección, teléfono, email) ya están registrados en el perfil del usuario y se auto-llenan automáticamente.
+
+NO extraigas ni busques estos datos en la conversación. El avatar NO debe preguntar por datos personales.
+
+Enfócate ÚNICAMENTE en extraer:
+- Tipo de documento (tutela o derecho de petición)
+- Datos de la entidad accionada
+- Hechos del caso
+- Derechos vulnerados
+- Pretensiones
+- Fundamentos de derecho
+- Pruebas
+- Si actúa en representación y datos del representado
 
 1. **tipo_documento**: Determina el tipo de documento legal apropiado según la conversación.
 
@@ -278,111 +285,67 @@ Busca activamente en la conversación:
    - TUTELA: Derechos fundamentales vulnerados (salud, vida, educación, debido proceso, etc.), requiere orden judicial, subsidiariedad o perjuicio irremediable
    - DERECHO DE PETICIÓN: Solicitud de información, trámites administrativos, quejas, reclamos, petición de servicios, primer mecanismo a agotar
 
-2. **nombre_solicitante**: El nombre completo de la persona que presenta el caso.
-   Busca en la conversación cuando la persona dice: "me llamo...", "mi nombre es...", "soy...", o cuando Sofía confirma el nombre.
-   Extrae el nombre EXACTAMENTE como lo dice el usuario.
-   Si no lo menciona, deja este campo vacío.
-
-3. **identificacion_solicitante**: El número de cédula o documento de identidad.
-   Busca cuando dice: "mi cédula es...", "mi documento es...", "mi número de identificación es...".
-
-   NORMALIZACIÓN CRÍTICA - Convierte a SOLO DÍGITOS sin separadores:
-   - Números en palabras → dígitos: "cincuenta y dos millones trescientos cuarenta y cinco mil seiscientos setenta y ocho" → "52345678"
-   - Con puntos → sin puntos: "52.345.678" → "52345678"
-   - Con guiones → sin guiones: "52-345-678" → "52345678"
-   - Con espacios → sin espacios: "52 345 678" → "52345678"
-   - Con comas → sin comas: "52,345,678" → "52345678"
-
-   Ejemplos de transcripción y normalización:
-   - Usuario dice: "uno dos tres cuatro cinco seis siete ocho" → Extraes: "12345678"
-   - Usuario dice: "cincuenta y dos punto trescientos cuarenta y cinco punto seiscientos setenta y ocho" → Extraes: "52345678"
-   - Usuario dice: "mil doscientos treinta y cuatro cinco seis siete ocho" → Extraes: "12345678"
-   - Usuario dice: "es el uno punto dos punto tres punto cuatro" → Extraes: "1234"
-
-   Si no lo menciona, deja este campo vacío.
-
-4. **direccion_solicitante**: La dirección completa del solicitante para notificaciones.
-   Busca cuando dice: "vivo en...", "mi dirección es...", "mi dirección completa es...".
-   Incluye calle, número, ciudad.
-   Si no lo menciona, deja este campo vacío.
-
-5. **telefono_solicitante**: El número de teléfono o celular del solicitante.
-   Busca cuando dice: "mi teléfono es...", "mi celular es...", "mi número es...".
-
-   NORMALIZACIÓN CRÍTICA - Convierte a SOLO DÍGITOS sin separadores:
-   - Números en palabras → dígitos: "tres cero cero uno dos tres cuatro cinco seis siete" → "3001234567"
-   - Con guiones → sin guiones: "300-123-4567" → "3001234567"
-   - Con espacios → sin espacios: "300 123 4567" → "3001234567"
-   - Con paréntesis → sin paréntesis: "(300) 123-4567" → "3001234567"
-
-   Ejemplos de transcripción y normalización:
-   - Usuario dice: "tres cero cero uno dos tres cuatro cinco seis siete" → Extraes: "3001234567"
-   - Usuario dice: "es el 300 123 4567" → Extraes: "3001234567"
-   - Usuario dice: "trescientos cero uno dos tres cuatro cinco seis siete" → Extraes: "3001234567"
-
-   Si no lo menciona, deja este campo vacío.
-
-6. **email_solicitante**: El correo electrónico del solicitante.
-   Busca cuando dice: "mi correo es...", "mi email es...", "mi correo electrónico es...".
-   Extrae el email completo.
-   Si no lo menciona, deja este campo vacío.
-
-7. **hechos**: Narrativa cronológica y detallada de los hechos.
-   Redacta en tercera persona, estilo legal, usando el nombre del solicitante si está disponible.
+2. **hechos**: Narrativa cronológica y detallada de los hechos.
+   Redacta en tercera persona, estilo legal.
    Si no hay información suficiente, deja este campo vacío.
 
-8. **derechos_vulnerados**: (Solo para tutelas) Lista de derechos fundamentales vulnerados con sus artículos constitucionales.
+3. **derechos_vulnerados**: (Solo para tutelas) Lista de derechos fundamentales vulnerados con sus artículos constitucionales.
    Formato: "Derecho a la Salud (Art. 49 C.P.), Derecho a la Vida (Art. 11 C.P.)"
    Si es derecho de petición o no hay información suficiente, deja este campo vacío.
 
-9. **entidad_accionada**: Nombre completo de la entidad, empresa o institución.
+4. **entidad_accionada**: Nombre completo de la entidad, empresa o institución.
    Debe ser el nombre oficial completo (ejemplo: "EPS Sanitas S.A.", "Ministerio de Salud").
    Si no hay información suficiente, deja este campo vacío.
 
-10. **direccion_entidad**: La dirección de la sede de la entidad accionada.
-    Busca cuando dice: "la dirección de la EPS es...", "la sede está en...", "está ubicada en...".
-    Si no lo menciona, deja este campo vacío.
+5. **direccion_entidad**: La dirección de la sede de la entidad accionada.
+   Busca cuando dice: "la dirección de la EPS es...", "la sede está en...", "está ubicada en...".
+   Si no lo menciona, deja este campo vacío.
 
-11. **pretensiones**: Lo que solicita el usuario.
-    - Para tutelas: Qué solicita que ordene el juez
-    - Para derechos de petición: Qué información o actuación solicita
-    Si no hay información suficiente, deja este campo vacío.
+6. **representante_legal**: Nombre del representante legal de la entidad accionada.
+   Busca cuando dice: "el gerente es...", "el director es...", "el representante legal es...".
+   Ejemplos: "Dr. Juan Pérez (Gerente)", "María López (Directora)", "Alcalde Pedro García".
+   Si no lo menciona, deja este campo vacío.
 
-12. **fundamentos_derecho**: Leyes, decretos o jurisprudencia aplicable mencionada en la conversación.
-    Solo incluye lo que fue EXPLÍCITAMENTE mencionado. Si nada fue mencionado, deja este campo vacío.
+7. **pretensiones**: Lo que solicita el usuario.
+   - Para tutelas: Qué solicita que ordene el juez
+   - Para derechos de petición: Qué información o actuación solicita
+   Si no hay información suficiente, deja este campo vacío.
 
-13. **pruebas**: Documentos, pruebas o anexos mencionados en la conversación.
-    Incluye: diagnósticos médicos, fórmulas, fotografías, derechos de petición previos, certificaciones, etc.
-    Enumera cada documento mencionado de forma clara. Si no hay información suficiente, deja este campo vacío.
+8. **fundamentos_derecho**: Leyes, decretos o jurisprudencia aplicable mencionada en la conversación.
+   Solo incluye lo que fue EXPLÍCITAMENTE mencionado. Si nada fue mencionado, deja este campo vacío.
 
-14. **actua_en_representacion**: (Booleano) true si el solicitante actúa en representación de otra persona, false si actúa en nombre propio.
+9. **pruebas**: Documentos, pruebas o anexos mencionados en la conversación.
+   Incluye: diagnósticos médicos, fórmulas, fotografías, derechos de petición previos, certificaciones, etc.
+   Enumera cada documento mencionado de forma clara. Si no hay información suficiente, deja este campo vacío.
+
+10. **actua_en_representacion**: (Booleano) true si el solicitante actúa en representación de otra persona, false si actúa en nombre propio.
     Detecta frases como "mi hijo", "mi madre", "represento a", "en nombre de", etc.
 
-15. **nombre_representado**: (Solo si actúa en representación) Nombre completo de la persona representada.
+11. **nombre_representado**: (Solo si actúa en representación) Nombre completo de la persona representada.
     Si no hay información suficiente, deja este campo vacío.
 
-16. **identificacion_representado**: (Solo si actúa en representación) Documento de identidad de la persona representada.
+12. **identificacion_representado**: (Solo si actúa en representación) Documento de identidad de la persona representada.
     Si no hay información suficiente, deja este campo vacío.
 
-17. **relacion_representado**: (Solo si actúa en representación) Relación entre el solicitante y el representado.
+13. **relacion_representado**: (Solo si actúa en representación) Relación entre el solicitante y el representado.
     Ejemplo: "madre", "padre", "apoderado", "tutor legal", "cuidador", etc.
     Si no hay información suficiente, deja este campo vacío.
 
-18. **tipo_representado**: (Solo si actúa en representación) Tipo de persona representada.
+14. **tipo_representado**: (Solo si actúa en representación) Tipo de persona representada.
     Opciones: "menor_edad", "adulto_mayor", "persona_discapacidad", "otro"
     Determina esto según el contexto de la conversación.
     Si no hay información suficiente, deja este campo vacío.
 
-19. **hubo_derecho_peticion_previo**: (Booleano) true si en la conversación se menciona que ya hubo un derecho de petición previo (presentado, radicado, enviado), false si no se menciona o no hubo.
+15. **hubo_derecho_peticion_previo**: (Booleano) true si en la conversación se menciona que ya hubo un derecho de petición previo (presentado, radicado, enviado), false si no se menciona o no hubo.
     Esto es importante para determinar si procede directamente una tutela por subsidiariedad.
 
-20. **detalle_derecho_peticion_previo**: (Solo si hubo derecho de petición previo) Detalles sobre el derecho de petición previo.
+16. **detalle_derecho_peticion_previo**: (Solo si hubo derecho de petición previo) Detalles sobre el derecho de petición previo.
     Incluye: fecha de radicación, entidad a la que se dirigió, qué se solicitó, respuesta obtenida (si la hubo), razón por la que no resolvió el problema.
     Si no hay información suficiente, deja este campo vacío.
 
 INSTRUCCIONES IMPORTANTES:
-- ⚠️ PRIORIDAD MÁXIMA: Extrae TODOS los datos personales del solicitante (nombre, cédula, dirección, teléfono, email) que se mencionen en la conversación
-- Lee TODA la conversación completa antes de extraer, los datos pueden estar en cualquier parte
+- ⚠️ RECUERDA: NO extraigas datos personales del solicitante (nombre, cédula, dirección, teléfono, email) - ya están en el perfil del usuario
+- Lee TODA la conversación completa antes de extraer
 - Si algún campo no tiene información suficiente en la conversación, devuélvelo como cadena vacía ""
 - Mantén lenguaje legal apropiado para Colombia
 - Redacta los hechos de forma coherente y cronológica
@@ -390,23 +353,17 @@ INSTRUCCIONES IMPORTANTES:
 - NO inventes información que no esté en la conversación
 - NO cites jurisprudencia a menos que haya sido mencionada explícitamente
 - IMPORTANTE: Determina correctamente el tipo_documento basándote en el contexto de la conversación
-- Convierte números en palabras a dígitos (ej: "cincuenta y dos" → "52")
 
 FORMATO DE SALIDA:
-Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta, sin markdown ni texto adicional.
-ASEGÚRATE de incluir TODOS los campos, especialmente los datos personales del solicitante:
+Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta, sin markdown ni texto adicional:
 {{
     "tipo_documento": "tutela" o "derecho_peticion",
     "razon_tipo_documento": "explicación breve de por qué se eligió tutela o derecho de petición",
-    "nombre_solicitante": "nombre completo del solicitante o cadena vacía",
-    "identificacion_solicitante": "número de cédula solo dígitos o cadena vacía",
-    "direccion_solicitante": "dirección completa o cadena vacía",
-    "telefono_solicitante": "teléfono solo dígitos o cadena vacía",
-    "email_solicitante": "correo electrónico o cadena vacía",
     "hechos": "narrativa de los hechos o cadena vacía",
     "derechos_vulnerados": "derechos con artículos o cadena vacía",
     "entidad_accionada": "nombre de la entidad o cadena vacía",
     "direccion_entidad": "dirección de la entidad o cadena vacía",
+    "representante_legal": "nombre del representante legal o cadena vacía",
     "pretensiones": "lo que se solicita o cadena vacía",
     "fundamentos_derecho": "fundamentos legales o cadena vacía",
     "pruebas": "lista de documentos/pruebas o cadena vacía",
@@ -445,7 +402,8 @@ ASEGÚRATE de incluir TODOS los campos, especialmente los datos personales del s
         # Validar que tenga las claves esperadas
         campos_esperados = [
             "tipo_documento", "razon_tipo_documento", "hechos", "derechos_vulnerados",
-            "entidad_accionada", "pretensiones", "fundamentos_derecho", "pruebas",
+            "entidad_accionada", "direccion_entidad", "representante_legal",
+            "pretensiones", "fundamentos_derecho", "pruebas",
             "actua_en_representacion", "nombre_representado", "identificacion_representado",
             "relacion_representado", "tipo_representado", "hubo_derecho_peticion_previo",
             "detalle_derecho_peticion_previo"

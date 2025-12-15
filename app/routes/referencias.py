@@ -132,3 +132,22 @@ def validar_nit_endpoint(nit: str):
         "es_valido": es_valido,
         "nit_formateado": formatear_nit(nit) if es_valido else None
     }
+
+
+@router.get("/validar/telefono/{telefono}")
+def validar_telefono_endpoint(telefono: str):
+    """
+    Valida si un teléfono colombiano tiene formato válido.
+
+    - **telefono**: Número de teléfono a validar (celular o fijo)
+    """
+    from ..core.validators import validar_telefono_colombiano, formatear_telefono
+
+    es_valido = validar_telefono_colombiano(telefono)
+
+    return {
+        "telefono": telefono,
+        "es_valido": es_valido,
+        "telefono_formateado": formatear_telefono(telefono) if es_valido else None,
+        "razon": None if es_valido else "Formato inválido. Debe ser 10 dígitos (celular con 3) o 7 dígitos (fijo)"
+    }

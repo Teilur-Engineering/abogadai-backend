@@ -39,8 +39,12 @@ async def iniciar_sesion(
             session_id=session_id,
             room_name=room_name,
             fecha_inicio_sesion=datetime.utcnow(),
+            # ✅ Auto-llenar TODOS los datos del perfil del usuario
             nombre_solicitante=f"{current_user.nombre} {current_user.apellido}",
-            email_solicitante=current_user.email
+            email_solicitante=current_user.email,
+            identificacion_solicitante=current_user.identificacion if current_user.identificacion else None,
+            direccion_solicitante=current_user.direccion if current_user.direccion else None,
+            telefono_solicitante=current_user.telefono if current_user.telefono else None
         )
 
         db.add(nuevo_caso)

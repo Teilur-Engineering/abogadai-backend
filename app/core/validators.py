@@ -214,6 +214,39 @@ def validar_telefono_colombiano(telefono: str) -> bool:
     return True
 
 
+def formatear_telefono(telefono: str) -> str:
+    """
+    Formatea un teléfono colombiano para display.
+
+    Args:
+        telefono: Número de teléfono
+
+    Returns:
+        str: Teléfono formateado (ej: "300 123 4567" o "601 234 5678")
+    """
+    if not telefono:
+        return telefono
+
+    # Limpiar el teléfono
+    tel_limpio = telefono.replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+
+    # Remover +57 si existe
+    if tel_limpio.startswith('+57'):
+        tel_limpio = tel_limpio[3:]
+    elif tel_limpio.startswith('57'):
+        tel_limpio = tel_limpio[2:]
+
+    # Formatear según longitud
+    if len(tel_limpio) == 10:
+        # Celular: 300 123 4567
+        return f"{tel_limpio[:3]} {tel_limpio[3:6]} {tel_limpio[6:]}"
+    elif len(tel_limpio) == 7:
+        # Fijo: 234 5678
+        return f"{tel_limpio[:3]} {tel_limpio[3:]}"
+    else:
+        return telefono
+
+
 def validar_email(email: str) -> bool:
     """
     Valida el formato de un email.

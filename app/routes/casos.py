@@ -24,10 +24,30 @@ def crear_caso(
 ):
     """
     Crea un nuevo caso (tutela o derecho de petición) para el usuario autenticado
+    Auto-llena datos del solicitante desde el perfil del usuario
     """
+    # Convertir a dict
+    caso_dict = caso_data.model_dump()
+
+    # Auto-llenar desde perfil si los campos están vacíos
+    if not caso_dict.get('nombre_solicitante'):
+        caso_dict['nombre_solicitante'] = f"{current_user.nombre} {current_user.apellido}"
+
+    if not caso_dict.get('email_solicitante'):
+        caso_dict['email_solicitante'] = current_user.email
+
+    if not caso_dict.get('identificacion_solicitante') and current_user.identificacion:
+        caso_dict['identificacion_solicitante'] = current_user.identificacion
+
+    if not caso_dict.get('direccion_solicitante') and current_user.direccion:
+        caso_dict['direccion_solicitante'] = current_user.direccion
+
+    if not caso_dict.get('telefono_solicitante') and current_user.telefono:
+        caso_dict['telefono_solicitante'] = current_user.telefono
+
     nuevo_caso = Caso(
         user_id=current_user.id,
-        **caso_data.model_dump()
+        **caso_dict
     )
 
     db.add(nuevo_caso)
@@ -47,6 +67,22 @@ def listar_casos(
     """
     casos = db.query(Caso).filter(Caso.user_id == current_user.id).order_by(Caso.updated_at.desc()).all()
     return casos
+
+
+@router.get("/prellenar-datos", response_model=dict)
+def obtener_datos_prellenado(current_user: User = Depends(get_current_user)):
+    """
+    Retorna los datos del perfil del usuario para pre-llenar un caso nuevo
+    El frontend puede usar esto antes de crear el caso
+    """
+    return {
+        "nombre_solicitante": f"{current_user.nombre} {current_user.apellido}",
+        "email_solicitante": current_user.email,
+        "identificacion_solicitante": current_user.identificacion or "",
+        "direccion_solicitante": current_user.direccion or "",
+        "telefono_solicitante": current_user.telefono or "",
+        "perfil_completo": current_user.perfil_completo
+    }
 
 
 @router.get("/{caso_id}", response_model=CasoResponse)
@@ -262,11 +298,7 @@ def procesar_transcripcion(
         # 🔍 LOG: Resumen de datos extraídos
         logger.info(f"\n📊 RESUMEN DE EXTRACCIÓN:")
         logger.info(f"   Tipo documento: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
-        logger.info(f"   Nombre solicitante: {'✅ ' + datos_extraidos.get('nombre_solicitante', '')[:30] if datos_extraidos.get('nombre_solicitante') else '❌ Vacío'}")
-        logger.info(f"   Identificación: {'✅ ' + str(datos_extraidos.get('identificacion_solicitante', '')) if datos_extraidos.get('identificacion_solicitante') else '❌ Vacío'}")
-        logger.info(f"   Dirección: {'✅ Extraído' if datos_extraidos.get('direccion_solicitante') else '❌ Vacío'}")
-        logger.info(f"   Teléfono: {'✅ ' + str(datos_extraidos.get('telefono_solicitante', '')) if datos_extraidos.get('telefono_solicitante') else '❌ Vacío'}")
-        logger.info(f"   Email: {'✅ ' + str(datos_extraidos.get('email_solicitante', '')) if datos_extraidos.get('email_solicitante') else '❌ Vacío'}")
+        logger.info(f"   ℹ️ DATOS DEL SOLICITANTE: Ya vienen del perfil del usuario (no se extraen)")
         logger.info(f"   Hechos: {'✅ Extraído' if datos_extraidos.get('hechos') else '❌ Vacío'}")
         logger.info(f"   Derechos vulnerados: {'✅ Extraído' if datos_extraidos.get('derechos_vulnerados') else '❌ Vacío'}")
         logger.info(f"   Entidad accionada: {'✅ ' + str(datos_extraidos.get('entidad_accionada', '')) if datos_extraidos.get('entidad_accionada') else '❌ Vacío'}")
@@ -315,30 +347,9 @@ def procesar_transcripcion(
             caso.fundamentos_derecho = datos_extraidos['fundamentos_derecho']
             campos_actualizados.append('fundamentos_derecho')
 
-        # 🆕 DATOS DEL SOLICITANTE (actualizar siempre, tal cual la IA los captó)
-        if 'nombre_solicitante' in datos_extraidos:
-            caso.nombre_solicitante = datos_extraidos['nombre_solicitante']
-            campos_actualizados.append('nombre_solicitante')
-
-        if 'identificacion_solicitante' in datos_extraidos:
-            # Guardar TAL CUAL la IA lo extrajo, incluso si está mal formateado
-            # El usuario verá el warning en el formulario y podrá corregirlo
-            caso.identificacion_solicitante = datos_extraidos['identificacion_solicitante']
-            campos_actualizados.append('identificacion_solicitante')
-
-        if 'direccion_solicitante' in datos_extraidos:
-            caso.direccion_solicitante = datos_extraidos['direccion_solicitante']
-            campos_actualizados.append('direccion_solicitante')
-
-        if 'telefono_solicitante' in datos_extraidos:
-            # Guardar TAL CUAL, el usuario verá el warning si está mal formateado
-            caso.telefono_solicitante = datos_extraidos['telefono_solicitante']
-            campos_actualizados.append('telefono_solicitante')
-
-        if 'email_solicitante' in datos_extraidos:
-            # Guardar TAL CUAL, el usuario verá el warning si está mal formateado
-            caso.email_solicitante = datos_extraidos['email_solicitante']
-            campos_actualizados.append('email_solicitante')
+        # ℹ️ NOTA: Los datos del solicitante (nombre, identificación, dirección, teléfono, email)
+        #          ya vienen del perfil del usuario y se auto-llenaron al crear el caso.
+        #          La IA ya NO extrae estos datos.
 
         # 🆕 DATOS DE LA ENTIDAD (campos adicionales)
         if 'direccion_entidad' in datos_extraidos:

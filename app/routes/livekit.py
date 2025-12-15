@@ -37,6 +37,7 @@ async def get_livekit_token(
         logger.info(f"   Session ID: {session_id}")
 
         # Crear caso sin room_name primero para obtener el ID
+        # Pre-llenar TODOS los datos del solicitante desde el perfil del usuario
         nuevo_caso = Caso(
             user_id=current_user.id,
             tipo_documento=TipoDocumento.TUTELA,
@@ -44,8 +45,12 @@ async def get_livekit_token(
             session_id=session_id,
             room_name=None,  # Se asignará después de obtener el ID
             fecha_inicio_sesion=datetime.utcnow(),
+            # ✅ Datos del solicitante pre-llenados desde el perfil
             nombre_solicitante=f"{current_user.nombre} {current_user.apellido}",
-            email_solicitante=current_user.email
+            email_solicitante=current_user.email,
+            identificacion_solicitante=current_user.identificacion if current_user.identificacion else None,
+            direccion_solicitante=current_user.direccion if current_user.direccion else None,
+            telefono_solicitante=current_user.telefono if current_user.telefono else None
         )
 
         db.add(nuevo_caso)
@@ -60,6 +65,12 @@ async def get_livekit_token(
 
         logger.info(f"✅ Caso creado exitosamente - ID: {nuevo_caso.id}")
         logger.info(f"   Room name: {room_name} (incluye caso_id para extracción)")
+        logger.info(f"   📝 Datos del solicitante pre-llenados:")
+        logger.info(f"      Nombre: {nuevo_caso.nombre_solicitante}")
+        logger.info(f"      Email: {nuevo_caso.email_solicitante}")
+        logger.info(f"      Identificación: {nuevo_caso.identificacion_solicitante or 'No disponible'}")
+        logger.info(f"      Dirección: {nuevo_caso.direccion_solicitante or 'No disponible'}")
+        logger.info(f"      Teléfono: {nuevo_caso.telefono_solicitante or 'No disponible'}")
 
         # 2. Generar token de LiveKit
         logger.info(f"🎫 Generando token de LiveKit...")
