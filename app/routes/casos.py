@@ -297,7 +297,7 @@ def procesar_transcripcion(
 
         # 🔍 LOG: Resumen de datos extraídos
         logger.info(f"\n📊 RESUMEN DE EXTRACCIÓN:")
-        logger.info(f"   Tipo documento: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
+        logger.info(f"   Tipo documento original: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
         logger.info(f"   ℹ️ DATOS DEL SOLICITANTE: Ya vienen del perfil del usuario (no se extraen)")
         logger.info(f"   Hechos: {'✅ Extraído' if datos_extraidos.get('hechos') else '❌ Vacío'}")
         logger.info(f"   Derechos vulnerados: {'✅ Extraído' if datos_extraidos.get('derechos_vulnerados') else '❌ Vacío'}")
@@ -309,18 +309,44 @@ def procesar_transcripcion(
         logger.info(f"   Actúa en representación: {datos_extraidos.get('actua_en_representacion', False)}")
         logger.info(f"   Hubo derecho petición previo: {datos_extraidos.get('hubo_derecho_peticion_previo', False)}")
 
+        # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD
+        logger.info(f"\n⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (Art. 86 C.P.):")
+        tiene_perjuicio = datos_extraidos.get('tiene_perjuicio_irremediable', False)
+        es_procedente = datos_extraidos.get('es_procedente_tutela', False)
+        tipo_recomendado = datos_extraidos.get('tipo_documento_recomendado', 'derecho_peticion')
+
+        logger.info(f"   Tiene perjuicio irremediable: {'✅ SÍ' if tiene_perjuicio else '❌ NO'}")
+        logger.info(f"   Es procedente tutela: {'✅ SÍ' if es_procedente else '❌ NO'}")
+        logger.info(f"   Tipo documento RECOMENDADO: {tipo_recomendado.upper()}")
+
+        if not es_procedente:
+            razon_improcedencia = datos_extraidos.get('razon_improcedencia', 'No especificada')
+            logger.info(f"   ⚠️ RAZÓN DE IMPROCEDENCIA: {razon_improcedencia}")
+            logger.info(f"   🔄 Se usará tipo: {tipo_recomendado}")
+        else:
+            logger.info(f"   ✅ Cumple requisitos de subsidiariedad")
+            razon = datos_extraidos.get('razon_tipo_documento', '')
+            logger.info(f"   📝 Razón: {razon}")
+
         # 🎯 NUEVA LÓGICA: Actualizar el caso con TODOS los datos extraídos
         # Incluso si están vacíos, mal formateados o incompletos
         # Las validaciones mostrarán advertencias en el formulario, pero no bloquean el auto-llenado
         campos_actualizados = []
 
-        # Actualizar tipo_documento (siempre, basado en la detección de IA)
-        if datos_extraidos.get('tipo_documento'):
-            tipo_doc = datos_extraidos['tipo_documento']
+        # ⚖️ Actualizar tipo_documento usando el RECOMENDADO (respeta subsidiariedad)
+        # La IA ya validó si procede tutela o debe ser derecho de petición
+        if datos_extraidos.get('tipo_documento_recomendado'):
+            tipo_doc = datos_extraidos['tipo_documento_recomendado']
+            tipo_anterior = caso.tipo_documento.value if caso.tipo_documento else 'ninguno'
+
             if tipo_doc == 'tutela':
                 caso.tipo_documento = TipoDocumento.TUTELA
             elif tipo_doc == 'derecho_peticion':
                 caso.tipo_documento = TipoDocumento.DERECHO_PETICION
+
+            if tipo_anterior != tipo_doc:
+                logger.info(f"   🔄 Tipo de documento cambiado: {tipo_anterior} → {tipo_doc}")
+
             campos_actualizados.append('tipo_documento')
 
         # Actualizar TODOS los campos, incluso si están vacíos o mal formateados
@@ -385,6 +411,27 @@ def procesar_transcripcion(
         if 'tipo_representado' in datos_extraidos:
             caso.tipo_representado = datos_extraidos['tipo_representado']
             campos_actualizados.append('tipo_representado')
+
+        # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (nuevos campos)
+        if 'hubo_derecho_peticion_previo' in datos_extraidos:
+            caso.hubo_derecho_peticion_previo = datos_extraidos['hubo_derecho_peticion_previo']
+            campos_actualizados.append('hubo_derecho_peticion_previo')
+
+        if 'detalle_derecho_peticion_previo' in datos_extraidos:
+            caso.detalle_derecho_peticion_previo = datos_extraidos['detalle_derecho_peticion_previo']
+            campos_actualizados.append('detalle_derecho_peticion_previo')
+
+        if 'tiene_perjuicio_irremediable' in datos_extraidos:
+            caso.tiene_perjuicio_irremediable = datos_extraidos['tiene_perjuicio_irremediable']
+            campos_actualizados.append('tiene_perjuicio_irremediable')
+
+        if 'es_procedente_tutela' in datos_extraidos:
+            caso.es_procedente_tutela = datos_extraidos['es_procedente_tutela']
+            campos_actualizados.append('es_procedente_tutela')
+
+        if 'razon_improcedencia' in datos_extraidos:
+            caso.razon_improcedencia = datos_extraidos['razon_improcedencia']
+            campos_actualizados.append('razon_improcedencia')
 
         logger.info(f"💾 Guardando cambios en la base de datos...")
         logger.info(f"   Campos actualizados ({len(campos_actualizados)}): {', '.join(campos_actualizados) if campos_actualizados else 'Ninguno'}")
@@ -490,6 +537,31 @@ def generar_documento(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Caso no encontrado"
         )
+
+    # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (Art. 86 C.P. - Decreto 2591/1991)
+    # Si es tutela, DEBE cumplir requisitos de subsidiariedad
+    if caso.tipo_documento and caso.tipo_documento.value == "tutela":
+        logger.info(f"⚖️ Validando subsidiariedad para tutela del caso {caso_id}...")
+
+        # Verificar si es_procedente_tutela fue evaluado y es False
+        if caso.es_procedente_tutela is False:
+            logger.warning(f"❌ Tutela NO procede - No cumple subsidiariedad")
+            logger.warning(f"   Razón: {caso.razon_improcedencia or 'No especificada'}")
+            logger.warning(f"   Hubo derecho de petición previo: {caso.hubo_derecho_peticion_previo}")
+            logger.warning(f"   Tiene perjuicio irremediable: {caso.tiene_perjuicio_irremediable}")
+
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "message": "La tutela no procede según el principio de subsidiariedad",
+                    "razon": caso.razon_improcedencia or "No se cumple el requisito de subsidiariedad. Primero debe agotar el derecho de petición o demostrar perjuicio irremediable.",
+                    "sugerencia": "Se recomienda presentar primero un derecho de petición a la entidad. Si no responden en 15 días o niegan sin fundamento, ahí sí procede la tutela.",
+                    "hubo_derecho_peticion_previo": caso.hubo_derecho_peticion_previo or False,
+                    "tiene_perjuicio_irremediable": caso.tiene_perjuicio_irremediable or False
+                }
+            )
+
+        logger.info(f"✅ Tutela cumple subsidiariedad - Puede generarse")
 
     # 🔍 VALIDACIÓN ESTRICTA: Validar campos críticos según tipo de documento
     from ..core.validation_helper import validar_caso_completo

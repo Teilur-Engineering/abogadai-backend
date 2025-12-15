@@ -266,24 +266,47 @@ Enfócate ÚNICAMENTE en extraer:
 
 1. **tipo_documento**: Determina el tipo de documento legal apropiado según la conversación.
 
-   REGLAS DE DECISIÓN (APLICAR EN ESTE ORDEN):
+   ⚖️ PRINCIPIO LEGAL CLAVE: SUBSIDIARIEDAD DE LA TUTELA (Art. 86 C.P. y Decreto 2591/1991)
+   La tutela SOLO procede cuando NO existe otro medio de defensa judicial o cuando ya se agotó.
+   Si no se cumple subsidiariedad, un juez rechazará la tutela de plano.
 
-   A. DERECHO DE PETICIÓN primero si NO hubo derecho de petición previo Y:
-      - Se busca obtener información de una entidad
-      - Se solicita un servicio que debería ser provisto
-      - Se presenta una queja o reclamo administrativo
-      - El caso NO tiene urgencia extrema ni perjuicio irremediable
-      → En estos casos, sugiere "derecho_peticion" como primer paso
+   REGLAS DE DECISIÓN ESTRICTAS (APLICAR EN ESTE ORDEN):
 
-   B. TUTELA si:
-      - YA hubo derecho de petición previo Y (no respondieron O negaron la solicitud O la respuesta no resolvió el problema)
-      - O hay urgencia extrema / perjuicio irremediable (ej: salud en riesgo inmediato, vida en peligro)
-      - O se vulneran derechos fundamentales Y no hay otro mecanismo de defensa judicial eficaz
-      → En estos casos, sugiere "tutela"
+   ❌ DERECHO DE PETICIÓN OBLIGATORIO (subsidiariedad no cumplida):
+   Si se cumplen TODAS estas condiciones:
+   - NO ha presentado derecho de petición previo a la entidad
+   - NO hay perjuicio irremediable (urgencia extrema que no puede esperar 15 días)
+   - Es trámite administrativo normal (información, servicios, quejas, reclamos)
 
-   CRITERIOS ADICIONALES:
-   - TUTELA: Derechos fundamentales vulnerados (salud, vida, educación, debido proceso, etc.), requiere orden judicial, subsidiariedad o perjuicio irremediable
-   - DERECHO DE PETICIÓN: Solicitud de información, trámites administrativos, quejas, reclamos, petición de servicios, primer mecanismo a agotar
+   → ACCIÓN: tipo_documento = "derecho_peticion"
+   → razon_tipo_documento = "No procede tutela sin agotar derecho de petición previo. No hay perjuicio irremediable."
+
+   ✅ TUTELA PROCEDE SI (subsidiariedad cumplida):
+
+   Caso 1: YA AGOTÓ DERECHO DE PETICIÓN
+   - Presentó derecho de petición hace más de 15 días Y no respondieron
+   - O respondieron negando sin fundamento válido
+   - O la respuesta no resolvió el problema
+
+   → ACCIÓN: tipo_documento = "tutela"
+   → razon_tipo_documento = "Procede tutela. Ya agotó derecho de petición sin solución satisfactoria."
+
+   Caso 2: PERJUICIO IRREMEDIABLE (urgencia que no puede esperar 15 días)
+   - Riesgo inminente de vida (ejemplo: necesita cirugía urgente en días)
+   - Riesgo grave e inmediato para salud (ejemplo: dolor insoportable, enfermedad que avanza rápidamente)
+   - Daño irreparable si se espera (ejemplo: pérdida permanente de movilidad, tratamiento de cáncer que no puede retrasarse)
+   - Situación médica certificada como urgente/emergencia
+
+   → ACCIÓN: tipo_documento = "tutela"
+   → razon_tipo_documento = "Procede tutela por perjuicio irremediable. Urgencia extrema justifica excepción a subsidiariedad."
+
+   Caso 3: NO EXISTE OTRO MECANISMO JUDICIAL
+   - Se vulneran derechos fundamentales
+   - NO hay otro medio de defensa judicial eficaz disponible
+   - El derecho de petición NO sería suficiente para proteger el derecho
+
+   → ACCIÓN: tipo_documento = "tutela"
+   → razon_tipo_documento = "Procede tutela. No existe otro mecanismo judicial eficaz."
 
 2. **hechos**: Narrativa cronológica y detallada de los hechos.
    Redacta en tercera persona, estilo legal.
@@ -343,6 +366,25 @@ Enfócate ÚNICAMENTE en extraer:
     Incluye: fecha de radicación, entidad a la que se dirigió, qué se solicitó, respuesta obtenida (si la hubo), razón por la que no resolvió el problema.
     Si no hay información suficiente, deja este campo vacío.
 
+17. **tiene_perjuicio_irremediable**: (Booleano) true si existe urgencia extrema que no puede esperar 15 días, false si puede esperar.
+    Evalúa si hay: riesgo de vida, riesgo grave para salud, daño irreparable, emergencia médica certificada.
+    Este campo es CRÍTICO para validar si procede tutela sin derecho de petición previo.
+
+18. **es_procedente_tutela**: (Booleano) true si la tutela cumple requisitos de subsidiariedad, false si no procede.
+    Debe ser true SOLO si:
+    - YA agotó derecho de petición sin solución satisfactoria
+    - O tiene perjuicio irremediable (tiene_perjuicio_irremediable = true)
+    - O no existe otro mecanismo judicial eficaz
+
+19. **razon_improcedencia**: (String) Si es_procedente_tutela = false, explica brevemente por qué no procede.
+    Ejemplo: "No ha agotado derecho de petición previo y no hay perjuicio irremediable"
+    Si es_procedente_tutela = true, deja este campo vacío.
+
+20. **tipo_documento_recomendado**: (String) El tipo de documento que REALMENTE debería generarse según subsidiariedad.
+    Valores posibles: "tutela" o "derecho_peticion"
+    - Si es_procedente_tutela = true → "tutela"
+    - Si es_procedente_tutela = false → "derecho_peticion"
+
 INSTRUCCIONES IMPORTANTES:
 - ⚠️ RECUERDA: NO extraigas datos personales del solicitante (nombre, cédula, dirección, teléfono, email) - ya están en el perfil del usuario
 - Lee TODA la conversación completa antes de extraer
@@ -373,7 +415,11 @@ Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta, sin mark
     "relacion_representado": "relación con el representado o cadena vacía",
     "tipo_representado": "tipo de representado o cadena vacía",
     "hubo_derecho_peticion_previo": true o false,
-    "detalle_derecho_peticion_previo": "detalles del derecho de petición previo o cadena vacía"
+    "detalle_derecho_peticion_previo": "detalles del derecho de petición previo o cadena vacía",
+    "tiene_perjuicio_irremediable": true o false,
+    "es_procedente_tutela": true o false,
+    "razon_improcedencia": "razón de improcedencia o cadena vacía",
+    "tipo_documento_recomendado": "tutela" o "derecho_peticion"
 }}"""
 
     try:
@@ -406,14 +452,18 @@ Devuelve ÚNICAMENTE un objeto JSON válido con esta estructura exacta, sin mark
             "pretensiones", "fundamentos_derecho", "pruebas",
             "actua_en_representacion", "nombre_representado", "identificacion_representado",
             "relacion_representado", "tipo_representado", "hubo_derecho_peticion_previo",
-            "detalle_derecho_peticion_previo"
+            "detalle_derecho_peticion_previo", "tiene_perjuicio_irremediable",
+            "es_procedente_tutela", "razon_improcedencia", "tipo_documento_recomendado"
         ]
         for campo in campos_esperados:
             if campo not in datos_extraidos:
                 if campo == "tipo_documento":
                     datos_extraidos[campo] = "tutela"  # Valor por defecto
-                elif campo in ["actua_en_representacion", "hubo_derecho_peticion_previo"]:
+                elif campo in ["actua_en_representacion", "hubo_derecho_peticion_previo",
+                               "tiene_perjuicio_irremediable", "es_procedente_tutela"]:
                     datos_extraidos[campo] = False  # Valor por defecto para booleanos
+                elif campo == "tipo_documento_recomendado":
+                    datos_extraidos[campo] = "derecho_peticion"  # Por defecto recomendar derecho de petición (subsidiariedad)
                 else:
                     datos_extraidos[campo] = ""
 

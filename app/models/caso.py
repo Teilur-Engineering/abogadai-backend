@@ -57,6 +57,13 @@ class Caso(Base):
     # Documento generado
     documento_generado = Column(Text, nullable=True)
 
+    # Validación de subsidiariedad de la tutela (Art. 86 C.P.)
+    hubo_derecho_peticion_previo = Column(Boolean, default=False, nullable=True)
+    detalle_derecho_peticion_previo = Column(Text, nullable=True)
+    tiene_perjuicio_irremediable = Column(Boolean, default=False, nullable=True)
+    es_procedente_tutela = Column(Boolean, default=False, nullable=True)
+    razon_improcedencia = Column(Text, nullable=True)
+
     # Análisis de IA
     analisis_fortaleza = Column(JSON, nullable=True)  # Análisis de fortaleza del caso
     analisis_calidad = Column(JSON, nullable=True)    # Análisis de calidad del documento
