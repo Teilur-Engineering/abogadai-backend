@@ -9,7 +9,7 @@ from ..models.user import User
 from ..models.caso import Caso, EstadoCaso, TipoDocumento
 from ..models.mensaje import Mensaje
 from ..schemas.caso import CasoCreate, CasoUpdate, CasoResponse, CasoListResponse
-from ..services import openai_service, document_service, ai_analysis_service
+from ..services import openai_service, document_service
 from .auth import get_current_user
 
 router = APIRouter(prefix="/casos", tags=["Casos"])
@@ -452,68 +452,6 @@ def procesar_transcripcion(
         )
 
 
-@router.post("/{caso_id}/analizar-fortaleza", response_model=CasoResponse)
-def analizar_fortaleza(
-    caso_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """
-    Analiza la fortaleza del caso ANTES de generar el documento.
-    Evalúa procedencia, derechos fundamentales, y probabilidad de éxito.
-    """
-    caso = db.query(Caso).filter(
-        Caso.id == caso_id,
-        Caso.user_id == current_user.id
-    ).first()
-
-    if not caso:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Caso no encontrado"
-        )
-
-    # Validar datos mínimos según el tipo de documento
-    if not caso.hechos:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Para analizar fortaleza se requiere al menos: hechos"
-        )
-
-    # Para tutelas, también se requieren derechos vulnerados
-    if caso.tipo_documento.value == "tutela" and not caso.derechos_vulnerados:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Para analizar fortaleza de una tutela se requiere: hechos y derechos vulnerados"
-        )
-
-    try:
-        datos_caso = {
-            'hechos': caso.hechos,
-            'derechos_vulnerados': caso.derechos_vulnerados,
-            'pretensiones': caso.pretensiones or '',
-            'entidad_accionada': caso.entidad_accionada or '',
-            'fundamentos_derecho': caso.fundamentos_derecho or ''
-        }
-
-        # Pasar el tipo de documento al análisis de fortaleza
-        tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
-        resultado = ai_analysis_service.analizar_fortaleza_caso(datos_caso, tipo_documento=tipo_doc)
-
-        if resultado.get('es_valido'):
-            caso.analisis_fortaleza = resultado.get('fortaleza')
-            db.commit()
-            db.refresh(caso)
-
-        return caso
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analizando fortaleza: {str(e)}"
-        )
-
-
 @router.post("/{caso_id}/generar", response_model=CasoResponse)
 def generar_documento(
     caso_id: int,
@@ -612,19 +550,6 @@ def generar_documento(
         # Actualizar caso con documento generado
         caso.documento_generado = documento_generado
         caso.estado = EstadoCaso.GENERADO
-
-        # Realizar análisis completo del documento generado (pasando el tipo de documento)
-        tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
-        analisis_completo = ai_analysis_service.analisis_completo_documento(
-            documento_generado,
-            datos_caso,
-            tipo_documento=tipo_doc
-        )
-
-        # Guardar análisis en el caso
-        caso.analisis_jurisprudencia = analisis_completo.get('jurisprudencia')
-        caso.analisis_calidad = analisis_completo.get('calidad')
-        caso.sugerencias_mejora = analisis_completo.get('sugerencias')
 
         db.commit()
         db.refresh(caso)

@@ -355,7 +355,7 @@ Enfócate ÚNICAMENTE en extraer:
     Si no hay información suficiente, deja este campo vacío.
 
 14. **tipo_representado**: (Solo si actúa en representación) Tipo de persona representada.
-    Opciones: "menor_edad", "adulto_mayor", "persona_discapacidad", "otro"
+    Opciones: "menor", "adulto_mayor", "persona_discapacidad", "otro"
     Determina esto según el contexto de la conversación.
     Si no hay información suficiente, deja este campo vacío.
 
