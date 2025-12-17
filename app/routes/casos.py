@@ -166,6 +166,108 @@ def eliminar_caso(
     return None
 
 
+@router.get("/{caso_id}/campos-criticos")
+def obtener_campos_criticos(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    🎯 ENDPOINT NUEVO - Retorna campos críticos y sensibles según tipo de documento
+
+    Según plan.md:
+    - Campos bloqueantes: impiden generar documento si están vacíos
+    - Campos sensibles: recomendados revisar, pero no bloquean generación
+    - Datos del solicitante: siempre en solo lectura (vienen del perfil)
+
+    El frontend usa esto para:
+    1. Mostrar indicadores visuales de campos obligatorios
+    2. Bloquear botón "Generar documento" si faltan campos críticos
+    3. Mostrar confirmación de datos sensibles antes de generar
+    """
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "tutela"
+
+    # Campos bloqueantes según tipo de documento (plan.md líneas 77-102)
+    if tipo_doc == "tutela":
+        bloqueantes = [
+            "entidad_accionada",
+            "hechos",
+            "derechos_vulnerados",
+            "pretensiones"
+        ]
+        sensibles = [
+            "direccion_entidad",
+            "representante_legal",
+            "pruebas"
+        ]
+    else:  # derecho_peticion
+        bloqueantes = [
+            "entidad_accionada",
+            "hechos",
+            "pretensiones"
+        ]
+        sensibles = [
+            "direccion_entidad",
+            "representante_legal",
+            "pruebas"
+        ]
+
+    # Si actúa en representación, agregar campos de representado como sensibles
+    if caso.actua_en_representacion:
+        sensibles.extend([
+            "nombre_representado",
+            "relacion_representado",
+            "identificacion_representado"
+        ])
+
+    # Datos del solicitante (siempre en solo lectura, desde perfil)
+    datos_solicitante = [
+        "nombre_solicitante",
+        "identificacion_solicitante",
+        "direccion_solicitante",
+        "telefono_solicitante",
+        "email_solicitante"
+    ]
+
+    # Evaluar qué campos están vacíos
+    bloqueantes_faltantes = []
+    for campo in bloqueantes:
+        valor = getattr(caso, campo, None)
+        if not valor or (isinstance(valor, str) and not valor.strip()):
+            bloqueantes_faltantes.append(campo)
+
+    sensibles_faltantes = []
+    for campo in sensibles:
+        valor = getattr(caso, campo, None)
+        if not valor or (isinstance(valor, str) and not valor.strip()):
+            sensibles_faltantes.append(campo)
+
+    puede_generar = len(bloqueantes_faltantes) == 0
+
+    return {
+        "caso_id": caso_id,
+        "tipo_documento": tipo_doc,
+        "puede_generar": puede_generar,
+        "campos_bloqueantes": bloqueantes,
+        "campos_sensibles": sensibles,
+        "datos_solicitante": datos_solicitante,
+        "bloqueantes_faltantes": bloqueantes_faltantes,
+        "sensibles_faltantes": sensibles_faltantes,
+        "actua_en_representacion": caso.actua_en_representacion or False
+    }
+
+
 @router.post("/{caso_id}/validar")
 def validar_caso(
     caso_id: int,
