@@ -74,6 +74,7 @@ class Caso(Base):
     fecha_reembolso = Column(DateTime, nullable=True)
     comentario_admin_reembolso = Column(Text, nullable=True)
     historial_reembolsos = Column(JSON, nullable=True)  # Historial de todas las solicitudes/decisiones
+    visto_por_usuario = Column(Boolean, default=True, nullable=False)  # Notificación de respuesta de reembolso
 
     # Validación de subsidiariedad de la tutela (Art. 86 C.P.)
     hubo_derecho_peticion_previo = Column(Boolean, default=False, nullable=True)

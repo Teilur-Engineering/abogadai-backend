@@ -87,6 +87,72 @@ def obtener_datos_prellenado(current_user: User = Depends(get_current_user)):
     }
 
 
+@router.get("/tiene-novedades")
+async def tiene_novedades(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    🔔 Verifica si el usuario tiene casos con novedades sin ver
+
+    Retorna True si hay casos con visto_por_usuario = False
+    (casos con respuesta de reembolso pendiente de ver)
+    """
+    try:
+        # Contar casos del usuario que no han sido vistos
+        casos_sin_ver = db.query(Caso).filter(
+            Caso.user_id == current_user.id,
+            Caso.visto_por_usuario == False
+        ).count()
+
+        return {
+            "tiene_novedades": casos_sin_ver > 0,
+            "cantidad": casos_sin_ver
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error verificando novedades: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error verificando novedades: {str(e)}"
+        )
+
+
+@router.post("/marcar-vistos")
+async def marcar_casos_vistos(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    ✅ Marca todos los casos del usuario como vistos
+
+    Se ejecuta al entrar a la página "Mis Casos"
+    """
+    try:
+        # Actualizar todos los casos del usuario a visto_por_usuario = True
+        casos_actualizados = db.query(Caso).filter(
+            Caso.user_id == current_user.id,
+            Caso.visto_por_usuario == False
+        ).update({"visto_por_usuario": True})
+
+        db.commit()
+
+        logger.info(f"✅ Marcados {casos_actualizados} casos como vistos - Usuario: {current_user.email}")
+
+        return {
+            "success": True,
+            "casos_marcados": casos_actualizados
+        }
+
+    except Exception as e:
+        logger.error(f"❌ Error marcando casos como vistos: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error marcando casos como vistos: {str(e)}"
+        )
+
+
 @router.get("/{caso_id}", response_model=CasoResponse)
 def obtener_caso(
     caso_id: int,

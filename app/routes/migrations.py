@@ -133,6 +133,26 @@ async def apply_migrations(
                 results["migrations_skipped"].append("fecha_pago ya existe")
                 logger.info("Campo 'fecha_pago' ya existe, saltando...")
 
+            # =========================================================
+            # MIGRACIÓN 3: Agregar campo de notificaciones (25-dic-2025)
+            # =========================================================
+
+            # 3.1. Agregar campo visto_por_usuario
+            if not column_exists(inspector, 'casos', 'visto_por_usuario'):
+                logger.info("Agregando campo 'visto_por_usuario'...")
+                conn.execute(text("""
+                    ALTER TABLE casos
+                    ADD COLUMN visto_por_usuario BOOLEAN DEFAULT TRUE NOT NULL
+                """))
+                conn.commit()
+                results["migrations_applied"].append("visto_por_usuario agregado")
+                logger.info("Campo 'visto_por_usuario' agregado exitosamente")
+                # Refrescar inspector
+                inspector = inspect(engine)
+            else:
+                results["migrations_skipped"].append("visto_por_usuario ya existe")
+                logger.info("Campo 'visto_por_usuario' ya existe, saltando...")
+
             # Verificación final
             final_inspector = inspect(engine)
             final_columns = [col['name'] for col in final_inspector.get_columns('casos')]
@@ -168,7 +188,8 @@ async def get_migration_status() -> Dict[str, Any]:
         required_columns = {
             'ciudad_de_los_hechos': 'ciudad_de_los_hechos' in columns,
             'documento_desbloqueado': 'documento_desbloqueado' in columns,
-            'fecha_pago': 'fecha_pago' in columns
+            'fecha_pago': 'fecha_pago' in columns,
+            'visto_por_usuario': 'visto_por_usuario' in columns
         }
 
         should_not_exist = {

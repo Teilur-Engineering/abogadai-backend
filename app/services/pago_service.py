@@ -109,7 +109,7 @@ def procesar_pago_exitoso(pago_id: int, db: Session) -> dict:
         "beneficios": {
             "sesiones_bonus_hoy": 2,
             "nivel_nuevo": nivel_info["nivel_nuevo"],
-            "pagos_mes": nivel_info["pagos_mes"]
+            "pagos_semana": nivel_info["pagos_semana"]
         }
     }
 
@@ -224,6 +224,7 @@ def procesar_reembolso(caso_id: int, aprobar: bool, comentario_admin: str, db: S
         caso.fecha_reembolso = datetime.utcnow()
         caso.reembolso_solicitado = False  # Ya no está pendiente
         caso.documento_desbloqueado = False  # Bloquear documento nuevamente
+        caso.visto_por_usuario = False  # Marcar como no visto para notificar al usuario
 
         # Guardar en historial
         caso.historial_reembolsos.append({
@@ -254,6 +255,7 @@ def procesar_reembolso(caso_id: int, aprobar: bool, comentario_admin: str, db: S
         # Rechazar solicitud de reembolso
         caso.reembolso_solicitado = False  # Ya no está pendiente (permite re-solicitar)
         caso.fecha_reembolso = datetime.utcnow()  # Registrar fecha de rechazo
+        caso.visto_por_usuario = False  # Marcar como no visto para notificar al usuario
 
         # Guardar en historial
         caso.historial_reembolsos.append({
