@@ -21,12 +21,14 @@ async def obtener_mi_nivel(
     """
     📊 Retorna nivel actual del usuario y beneficios
 
+    Sistema de niveles semanales (actualizado cada 7 días)
+
     Información incluida:
     - Nivel actual (0-3)
     - Nombre del nivel (FREE, BRONCE, PLATA, ORO)
-    - Límites de sesión según nivel
-    - Cantidad de pagos del último mes
-    - Sesiones extra disponibles hoy
+    - Límites de sesión según nivel (sesiones base por día)
+    - Cantidad de pagos de la última semana
+    - Sesiones extra disponibles hoy (+2 por cada pago del día)
     """
     limites = nivel_service.obtener_limites_usuario(current_user.id, db)
 
@@ -53,10 +55,10 @@ async def obtener_mi_nivel(
         # Frontend espera "nivel_actual" en lugar de "nivel"
         "nivel_actual": limites["nombre_nivel"],  # "FREE", "BRONCE", "PLATA", "ORO"
         "nombre_nivel": limites["nombre_nivel"],
-        "pagos_ultimo_mes": current_user.pagos_ultimo_mes,
+        "pagos_ultima_semana": current_user.pagos_ultimo_mes,  # Campo BD se llama pagos_ultimo_mes pero contiene semana
         "sesiones_extra_hoy": current_user.sesiones_extra_hoy,
         # Frontend espera estos campos directos
-        "sesiones_maximas": limites["sesiones_dia"],
+        "sesiones_maximas": limites["sesiones_dia"],  # Sesiones BASE por día según nivel
         "minutos_maximos": limites["min_sesion"],
         "max_docs_sin_pagar": 3,  # Todos los niveles permiten 3 docs sin pagar
         "precio_documento": 50000,  # Precio estándar en COP
@@ -79,6 +81,8 @@ async def obtener_beneficios_niveles():
     """
     📋 Retorna tabla de beneficios de todos los niveles
 
+    Sistema de niveles semanales - actualizado cada 7 días
+
     Endpoint público (no requiere autenticación)
     Útil para mostrar tabla de precios/beneficios en landing page
     """
@@ -87,7 +91,7 @@ async def obtener_beneficios_niveles():
             {
                 "nivel": 0,
                 "nombre": "FREE",
-                "requisito": "Sin pagos en últimos 30 días",
+                "requisito": "Sin pagos en última semana (7 días)",
                 "color": "#9CA3AF",
                 "beneficios": {
                     "sesiones_dia": 3,
@@ -99,7 +103,7 @@ async def obtener_beneficios_niveles():
             {
                 "nivel": 1,
                 "nombre": "BRONCE",
-                "requisito": "1 pago en últimos 30 días",
+                "requisito": "1 pago en última semana (7 días)",
                 "color": "#CD7F32",
                 "beneficios": {
                     "sesiones_dia": 5,
@@ -111,7 +115,7 @@ async def obtener_beneficios_niveles():
             {
                 "nivel": 2,
                 "nombre": "PLATA",
-                "requisito": "2 pagos en últimos 30 días",
+                "requisito": "2 pagos en última semana (7 días)",
                 "color": "#C0C0C0",
                 "beneficios": {
                     "sesiones_dia": 7,
@@ -123,7 +127,7 @@ async def obtener_beneficios_niveles():
             {
                 "nivel": 3,
                 "nombre": "ORO",
-                "requisito": "3+ pagos en últimos 30 días",
+                "requisito": "3+ pagos en última semana (7 días)",
                 "color": "#FFD700",
                 "beneficios": {
                     "sesiones_dia": 10,

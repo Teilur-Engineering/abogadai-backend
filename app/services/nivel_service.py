@@ -11,7 +11,13 @@ from ..models import User, Pago, EstadoPago
 
 def calcular_nivel_usuario(user_id: int, db: Session) -> int:
     """
-    Calcula el nivel del usuario basado en pagos del último mes
+    Calcula el nivel del usuario basado en pagos de la última semana (7 días)
+
+    Sistema de niveles semanales:
+    - FREE: 0 pagos última semana → 3 sesiones base
+    - BRONCE: 1 pago última semana → 5 sesiones base
+    - PLATA: 2 pagos última semana → 7 sesiones base
+    - ORO: 3+ pagos última semana → 10 sesiones base
 
     Args:
         user_id: ID del usuario
@@ -20,21 +26,21 @@ def calcular_nivel_usuario(user_id: int, db: Session) -> int:
     Returns:
         int: 0=FREE, 1=BRONCE, 2=PLATA, 3=ORO
     """
-    hace_30_dias = datetime.utcnow() - timedelta(days=30)
+    hace_7_dias = datetime.utcnow() - timedelta(days=7)
 
-    # Contar pagos exitosos en últimos 30 días
-    pagos_mes = db.query(Pago).filter(
+    # Contar pagos exitosos en últimos 7 días
+    pagos_semana = db.query(Pago).filter(
         Pago.user_id == user_id,
         Pago.estado == EstadoPago.EXITOSO,
-        Pago.fecha_pago >= hace_30_dias
+        Pago.fecha_pago >= hace_7_dias
     ).count()
 
     # Determinar nivel según cantidad de pagos
-    if pagos_mes == 0:
+    if pagos_semana == 0:
         return 0  # FREE
-    elif pagos_mes == 1:
+    elif pagos_semana == 1:
         return 1  # BRONCE
-    elif pagos_mes == 2:
+    elif pagos_semana == 2:
         return 2  # PLATA
     else:  # 3 o más
         return 3  # ORO
@@ -43,6 +49,8 @@ def calcular_nivel_usuario(user_id: int, db: Session) -> int:
 def recalcular_todos_los_niveles(db: Session):
     """
     Recalcula niveles de todos los usuarios (CRON diario)
+
+    Actualiza el nivel basado en pagos de la última semana (7 días)
 
     Args:
         db: Sesión de base de datos
@@ -53,8 +61,9 @@ def recalcular_todos_los_niveles(db: Session):
         nivel_nuevo = calcular_nivel_usuario(usuario.id, db)
 
         # Actualizar campos del usuario
+        # Nota: campo se llama 'pagos_ultimo_mes' en BD pero contiene pagos de última semana
         usuario.nivel_usuario = nivel_nuevo
-        usuario.pagos_ultimo_mes = _contar_pagos_mes(usuario.id, db)
+        usuario.pagos_ultimo_mes = _contar_pagos_semana(usuario.id, db)
         usuario.ultimo_recalculo_nivel = datetime.utcnow()
 
     db.commit()
@@ -127,6 +136,8 @@ def actualizar_nivel_post_pago(user_id: int, db: Session):
     """
     Actualiza nivel inmediatamente después de un pago exitoso
 
+    También otorga +2 sesiones extra ese día
+
     Args:
         user_id: ID del usuario
         db: Sesión de base de datos
@@ -138,11 +149,11 @@ def actualizar_nivel_post_pago(user_id: int, db: Session):
 
     # Recalcular nivel
     nivel_nuevo = calcular_nivel_usuario(user_id, db)
-    pagos_mes = _contar_pagos_mes(user_id, db)
+    pagos_semana = _contar_pagos_semana(user_id, db)
 
     # Actualizar usuario
     usuario.nivel_usuario = nivel_nuevo
-    usuario.pagos_ultimo_mes = pagos_mes
+    usuario.pagos_ultimo_mes = pagos_semana  # Campo en BD, pero contiene pagos de semana
     usuario.ultimo_recalculo_nivel = datetime.utcnow()
 
     db.commit()
@@ -150,7 +161,7 @@ def actualizar_nivel_post_pago(user_id: int, db: Session):
     return {
         "nivel_anterior": usuario.nivel_usuario,
         "nivel_nuevo": nivel_nuevo,
-        "pagos_mes": pagos_mes
+        "pagos_semana": pagos_semana
     }
 
 
@@ -174,21 +185,21 @@ def resetear_sesiones_extra(db: Session):
     return len(usuarios_actualizados)
 
 
-def _contar_pagos_mes(user_id: int, db: Session) -> int:
+def _contar_pagos_semana(user_id: int, db: Session) -> int:
     """
-    Función auxiliar para contar pagos exitosos del último mes
+    Función auxiliar para contar pagos exitosos de la última semana (7 días)
 
     Args:
         user_id: ID del usuario
         db: Sesión de base de datos
 
     Returns:
-        int: Cantidad de pagos exitosos
+        int: Cantidad de pagos exitosos en los últimos 7 días
     """
-    hace_30_dias = datetime.utcnow() - timedelta(days=30)
+    hace_7_dias = datetime.utcnow() - timedelta(days=7)
 
     return db.query(Pago).filter(
         Pago.user_id == user_id,
         Pago.estado == EstadoPago.EXITOSO,
-        Pago.fecha_pago >= hace_30_dias
+        Pago.fecha_pago >= hace_7_dias
     ).count()
