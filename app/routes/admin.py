@@ -5,7 +5,7 @@ Solo accesible para usuarios administradores
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 
 from ..core.database import get_db
 from ..models.user import User
@@ -167,7 +167,7 @@ async def obtener_metricas_niveles(
 
         # Estadísticas de pagos
         total_pagos = db.query(Pago).count()
-        ingresos_totales = db.query(Pago).with_entities(db.func.sum(Pago.monto)).scalar() or 0
+        ingresos_totales = db.query(Pago).with_entities(func.sum(Pago.monto)).scalar() or 0
 
         return {
             "usuarios": {
@@ -219,7 +219,7 @@ async def obtener_metricas_reembolsos(
         # Total de reembolsos aprobados
         total_reembolsado = db.query(Pago).filter(
             Pago.fecha_reembolso != None
-        ).with_entities(db.func.sum(Pago.monto)).scalar() or 0
+        ).with_entities(func.sum(Pago.monto)).scalar() or 0
 
         # Solicitudes rechazadas
         solicitudes_rechazadas = db.query(Caso).filter(
