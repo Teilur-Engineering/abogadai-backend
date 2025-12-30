@@ -76,31 +76,39 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
 3. ESTRUCTURA REQUERIDA (usar NUMERACIÓN ROMANA):
 
    **I. HECHOS**
-   Narrativa clara y cronológica de los hechos que fundamentan la acción. Numera los hechos si son varios.
+   IMPORTANTE: Si hay VARIOS hechos, enuméralos en LISTA con formato numérico (1., 2., 3., etc.) o con guiones (- , - , -).
+   Si es UN SOLO hecho o narrativa simple, escríbelo como PÁRRAFO corrido bien redactado y argumentado.
+   Los hechos deben presentarse de forma clara y cronológica.
 
    **II. DERECHOS FUNDAMENTALES VULNERADOS**
-   Identificación explícita de los derechos fundamentales vulnerados con sus artículos constitucionales.
-   Formato: "- Derecho a... (Artículo XX de la Constitución Política)"
+   FORMATO DE PÁRRAFO: Presenta los derechos fundamentales vulnerados en un párrafo bien argumentado y profesional.
+   Explica de forma narrativa cuáles derechos se están vulnerando y cita los artículos constitucionales integrados en el texto.
+   Ejemplo: "En el presente caso se encuentran vulnerados el derecho a la salud consagrado en el Artículo 49 de la Constitución Política, así como el derecho a la vida contemplado en el Artículo 11 de la misma norma superior..."
+   NO uses listas, desarrolla una argumentación coherente en prosa legal.
 
    **III. PRETENSIONES**
-   Lo que se solicita que ordene el juez de manera clara y específica.
-   Usar formato: "PRIMERA:", "SEGUNDA:", "TERCERA:", etc.
+   FORMATO DE LISTA OBLIGATORIO: Lo que se solicita que ordene el juez de manera clara y específica.
+   Usar formato enumerado: "PRIMERA:", "SEGUNDA:", "TERCERA:", etc.
 
    **IV. FUNDAMENTOS DE DERECHO**
-   Base jurídica constitucional (Art. 86 C.P. y Decreto 2591 de 1991).
+   FORMATO DE PÁRRAFO: Redacta la base jurídica constitucional en párrafos corridos bien argumentados.
+   Menciona Art. 86 C.P. y Decreto 2591 de 1991 integrados en una argumentación coherente.
+   NO uses listas aquí, escribe texto argumentativo profesional.
 
    **V. PROCEDENCIA Y LEGITIMIDAD**
-   Explica por qué la tutela es procedente en este caso concreto, citando el Decreto 2591 de 1991 y la jurisprudencia aplicable.
-   Demuestra la legitimación en la causa (quién presenta y por qué tiene derecho a hacerlo).
-   Si actúa en representación, justifica la legitimidad (ej: para menores, el padre/madre tiene legitimidad; para adultos mayores dependientes, el cuidador; etc.)
+   FORMATO DE PÁRRAFO: Explica en texto corrido y bien argumentado por qué la tutela es procedente, citando el Decreto 2591 de 1991.
+   Demuestra la legitimación en la causa de forma narrativa.
+   Si actúa en representación, justifica la legitimidad en párrafos coherentes.
+   NO uses listas, desarrolla la argumentación en prosa legal profesional.
 
    **VI. INEXISTENCIA DE OTRO MECANISMO DE DEFENSA JUDICIAL**
-   Explica qué otros medios ya se usaron (derecho de petición, quejas internas, etc.) y por qué no fueron suficientes, o por qué no existe otro mecanismo de defensa judicial eficaz.
-   Si hay perjuicio irremediable o urgencia, menciónalo aquí.
+   FORMATO DE PÁRRAFO: Explica en texto corrido qué otros medios ya se usaron y por qué no fueron suficientes.
+   Si hay perjuicio irremediable o urgencia, desarróllalo en argumentación coherente.
+   NO uses listas, escribe párrafos argumentativos profesionales.
 
    **VII. PRUEBAS Y ANEXOS**
-   Enumeración formal de las pruebas que se anexan.
-   Formato: "- Anexo 1: [descripción]"
+   FORMATO DE LISTA OBLIGATORIO: Enumeración formal de las pruebas que se anexan.
+   Formato: "- Anexo 1: [descripción]" o "1. [descripción]"
    USA EXACTAMENTE la información proporcionada en "PRUEBAS Y DOCUMENTOS ANEXOS" arriba.
    Si no se especificaron pruebas, indica: "Se aportarán las pruebas pertinentes en el término legal."
 
@@ -136,13 +144,14 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
 
 9. El documento debe tener apariencia de documento legal oficial, no de borrador
 
-IMPORTANTE SOBRE JURISPRUDENCIA:
-- SOLO cita jurisprudencia si estás COMPLETAMENTE SEGURO de que existe
-- Si no estás seguro de una sentencia específica, NO LA CITES
-- Es mejor NO citar jurisprudencia que citar sentencias inventadas
-- Si citas, usa SOLO sentencias muy conocidas y emblemáticas de la Corte Constitucional
-- Puedes mencionar "según jurisprudencia reiterada de la Corte Constitucional" sin número específico
-- NUNCA inventes números de sentencias
+10. NO cites jurisprudencia ni sentencias de la Corte Constitucional. Basa los argumentos únicamente en artículos constitucionales y decretos legales.
+
+11. Para separar secciones usa ÚNICAMENTE líneas en blanco (saltos de línea). NO uses separadores gráficos como guiones (--), asteriscos, líneas, ni ningún otro símbolo decorativo.
+
+12. IMPORTANTE - FORMATO DE CONTENIDO:
+   - USA LISTAS solo para: Hechos (si son varios), Pretensiones, Pruebas y Anexos
+   - USA PÁRRAFOS ARGUMENTATIVOS para: Derechos Fundamentales Vulnerados, Fundamentos de Derecho, Procedencia y Legitimidad, Inexistencia de otro mecanismo
+   - Los párrafos argumentativos deben ser texto corrido profesional, coherente y bien desarrollado. NO uses viñetas ni listas en secciones argumentativas.
 
 El documento debe estar completo, profesional y listo para ser presentado ante un juez de la República de Colombia."""
 
@@ -233,29 +242,35 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
 2. ESTRUCTURA REQUERIDA (usar NUMERACIÓN ROMANA):
 
    **I. OBJETO**
-   Presentar la naturaleza de la petición de manera clara y directa.
+   FORMATO DE PÁRRAFO: Presenta la naturaleza de la petición en texto corrido, de manera clara y directa.
+   NO uses listas, escribe un párrafo introductorio profesional.
 
    **II. HECHOS**
-   Relatar los hechos cronológicamente y de forma clara.
+   IMPORTANTE: Si hay VARIOS hechos, enuméralos en LISTA con formato numérico (1., 2., 3., etc.) o con guiones (- , - , -).
+   Si es UN SOLO hecho o narrativa simple, escríbelo como PÁRRAFO corrido bien redactado.
+   Relata los hechos cronológicamente y de forma clara.
 
    **III. FUNDAMENTOS DE DERECHO**
-   - SIEMPRE citar el Art. 23 de la Constitución Política de Colombia
-   - SIEMPRE citar la Ley 1437 de 2011 (Código de Procedimiento Administrativo y de lo Contencioso Administrativo)
-   - Mencionar EXPRESAMENTE el término de respuesta:
+   FORMATO DE PÁRRAFO: Redacta los fundamentos legales en párrafos corridos bien argumentados.
+   Integra de forma narrativa:
+   - Art. 23 de la Constitución Política de Colombia
+   - Ley 1437 de 2011 (Código de Procedimiento Administrativo y de lo Contencioso Administrativo)
+   - Menciona el término de respuesta dentro del texto argumentativo:
      * 15 días hábiles (Art. 14 Ley 1437) para peticiones generales
      * 10 días hábiles (Art. 14 Ley 1437) cuando se solicitan documentos o información específica
-   - Si involucra menores de edad: citar el Art. 44 C.P. (derechos fundamentales de los niños) y mencionar el interés superior del menor
-   - Si involucra adultos mayores: citar el Art. 46 C.P. (protección especial a la tercera edad)
-   - Si involucra personas con discapacidad: citar el Art. 47 C.P. (protección y atención especial)
+   - Si involucra menores de edad: cita el Art. 44 C.P. y menciona el interés superior del menor en el texto
+   - Si involucra adultos mayores: cita el Art. 46 C.P. dentro de la argumentación
+   - Si involucra personas con discapacidad: cita el Art. 47 C.P. integrado en el texto
+   NO uses listas de viñetas, desarrolla una argumentación legal coherente en prosa profesional.
 
    **IV. PETICIONES**
-   Enumerar de forma clara, específica y accionable lo que se solicita a la entidad.
+   FORMATO DE LISTA OBLIGATORIO: Enumera de forma clara, específica y accionable lo que se solicita a la entidad.
    Usar formato: "PRIMERO:", "SEGUNDO:", "TERCERO:", etc.
    Cada petición debe ser específica, medible y accionable.
 
    **V. ANEXOS**
-   Si se especificaron pruebas o documentos anexos, USA EXACTAMENTE la información proporcionada en "PRUEBAS Y DOCUMENTOS ANEXOS" arriba.
-   Formato: "- Anexo 1: [descripción]"
+   FORMATO DE LISTA OBLIGATORIO: Si se especificaron pruebas o documentos anexos, USA EXACTAMENTE la información proporcionada en "PRUEBAS Y DOCUMENTOS ANEXOS" arriba.
+   Formato: "- Anexo 1: [descripción]" o "1. [descripción]"
    Si no se especificaron, indica: "Se aportarán posteriormente los documentos necesarios."
 
    **VI. NOTIFICACIONES**
@@ -288,6 +303,13 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
 7. El documento debe tener apariencia de documento legal oficial, no de borrador
 
 8. El documento debe estar completo y listo para radicar
+
+9. Para separar secciones usa ÚNICAMENTE líneas en blanco (saltos de línea). NO uses separadores gráficos como guiones (--), asteriscos, líneas, ni ningún otro símbolo decorativo.
+
+10. IMPORTANTE - FORMATO DE CONTENIDO:
+   - USA LISTAS solo para: Hechos (si son varios), Peticiones, y Anexos
+   - USA PÁRRAFOS ARGUMENTATIVOS para: Objeto y Fundamentos de Derecho
+   - Los párrafos argumentativos deben ser texto corrido profesional, coherente y bien desarrollado. NO uses viñetas ni listas en secciones argumentativas.
 
 El documento debe estar listo para ser presentado ante la entidad correspondiente en Colombia."""
 
@@ -432,7 +454,7 @@ Enfócate ÚNICAMENTE en extraer:
    - Para derechos de petición: Qué información o actuación solicita
    Si no hay información suficiente, deja este campo vacío.
 
-8. **fundamentos_derecho**: Leyes, decretos o jurisprudencia aplicable mencionada en la conversación.
+8. **fundamentos_derecho**: Leyes o decretos aplicables mencionados en la conversación.
    Solo incluye lo que fue EXPLÍCITAMENTE mencionado. Si nada fue mencionado, deja este campo vacío.
 
 9. **pruebas**: Documentos, pruebas o anexos mencionados en la conversación.
@@ -494,7 +516,6 @@ INSTRUCCIONES IMPORTANTES:
 - Redacta los hechos de forma coherente y cronológica
 - Sé preciso con los artículos constitucionales (usa "Art. XX C.P.")
 - NO inventes información que no esté en la conversación
-- NO cites jurisprudencia a menos que haya sido mencionada explícitamente
 - IMPORTANTE: Determina correctamente el tipo_documento basándote en el contexto de la conversación
 
 FORMATO DE SALIDA:

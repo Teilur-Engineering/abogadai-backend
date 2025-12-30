@@ -7,6 +7,16 @@ from io import BytesIO
 import re
 
 
+def _convertir_markdown_a_html(texto: str) -> str:
+    """
+    Convierte formato markdown a HTML para ReportLab.
+    Específicamente convierte **texto** a <b>texto</b>
+    """
+    # Convertir **texto** a <b>texto</b>
+    texto = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', texto)
+    return texto
+
+
 def _agregar_numero_pagina(canvas, doc):
     """
     Callback para agregar número de página al pie
@@ -135,8 +145,10 @@ def generar_pdf(documento_texto: str, nombre_solicitante: str = "Documento") -> 
 
         # Texto normal
         else:
+            # Convertir markdown a HTML (para negrilla dentro de párrafos)
+            linea_procesada = _convertir_markdown_a_html(linea)
             # Preservar formato de listas y viñetas
-            p = Paragraph(linea, styles['Justify'])
+            p = Paragraph(linea_procesada, styles['Justify'])
             story.append(p)
 
     # Construir el PDF con numeración de páginas
