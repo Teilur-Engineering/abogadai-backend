@@ -412,3 +412,199 @@ def validar_caso_completo(caso, tipo_documento: str) -> Dict[str, any]:
         "errores": [e.to_dict() for e in errores],
         "advertencias": [a.to_dict() for a in advertencias]
     }
+
+
+# =============================================================================
+# DETECCIÓN INTELIGENTE DE DERECHOS FUNDAMENTALES
+# Basado en feedback jurídico sobre subsidiariedad flexible
+# =============================================================================
+
+# Palabras clave para detección automática de derechos críticos urgentes
+DERECHOS_CRITICOS_URGENTES = {
+    "vida": [
+        "muerte", "morir", "fallecer", "agonía", "peligro de muerte",
+        "riesgo de muerte", "mortal", "terminal", "fallecimiento"
+    ],
+    "salud_urgente": [
+        # Procedimientos médicos urgentes
+        "cirugía", "operación", "intervención quirúrgica", "procedimiento médico",
+        "urgente", "emergencia", "urgencias", "emergencias médicas",
+        # Medicamentos y tratamientos
+        "medicamento", "tratamiento", "terapia", "quimioterapia", "radioterapia",
+        "diálisis", "hemodiálisis", "transfusión",
+        # Síntomas graves
+        "dolor insoportable", "dolor severo", "dolor agudo", "hemorragia",
+        "sangrado", "crisis", "convulsiones", "desmayo",
+        # Enfermedades graves
+        "cáncer", "tumor", "infarto", "derrame", "accidente cerebrovascular",
+        "insuficiencia", "falla", "paro", "shock",
+        # Contexto hospitalario
+        "hospital", "clínica", "uci", "unidad de cuidados intensivos",
+        "hospitalización", "internado", "ingreso hospitalario",
+        # Negación de servicios críticos
+        "negaron", "negó", "niegan", "rechazaron", "no autorizan",
+        "no aprueban", "sin autorización", "sin cita"
+    ],
+    "educacion_critica": [
+        "no puede estudiar", "expulsión", "expulsado", "expulsaron",
+        "matrícula cancelada", "sin cupo", "impedido de asistir",
+        "no lo dejan entrar", "bloqueado", "suspendido del colegio",
+        "no puede graduarse", "perdió el semestre", "cancelaron matrícula"
+    ],
+    "minimo_vital": [
+        "sin dinero", "hambre", "no tengo para comer", "indigencia",
+        "sin vivienda", "desalojo", "desalojar", "en la calle",
+        "pensión", "subsidio vital", "mesada pensional",
+        "sin ingresos", "sin sustento", "sin recursos"
+    ],
+    "dignidad_humana": [
+        "maltrato", "tortura", "tratos crueles", "degradante",
+        "humillación", "discriminación", "exclusión",
+        "violencia", "abuso", "acoso"
+    ]
+}
+
+# Palabras clave para casos administrativos (requieren derecho de petición previo)
+DERECHOS_ADMINISTRATIVOS = {
+    "peticion": [
+        "solicitud", "certificado", "copia", "información",
+        "respuesta", "contestación", "oficio", "radicado",
+        "constancia", "certificación"
+    ],
+    "habeas_data": [
+        "datos personales", "historial crediticio", "reportes",
+        "centrales de riesgo", "información personal",
+        "actualización de datos", "corrección de información"
+    ],
+    "administrativo": [
+        "trámite", "procedimiento administrativo", "actuación administrativa",
+        "consulta", "requerimiento", "notificación administrativa"
+    ]
+}
+
+
+def detectar_palabras_clave(categoria: str, texto: str) -> bool:
+    """
+    Detecta si un texto contiene palabras clave de una categoría específica
+
+    Args:
+        categoria: Categoría a buscar (ej: "vida", "salud_urgente", "peticion")
+        texto: Texto donde buscar (hechos, pretensiones, conversación)
+
+    Returns:
+        True si se encontró al menos una palabra clave de la categoría
+    """
+    if not texto:
+        return False
+
+    texto_lower = texto.lower()
+
+    # Buscar en derechos críticos urgentes
+    if categoria in DERECHOS_CRITICOS_URGENTES:
+        palabras = DERECHOS_CRITICOS_URGENTES[categoria]
+        return any(palabra in texto_lower for palabra in palabras)
+
+    # Buscar en derechos administrativos
+    if categoria in DERECHOS_ADMINISTRATIVOS:
+        palabras = DERECHOS_ADMINISTRATIVOS[categoria]
+        return any(palabra in texto_lower for palabra in palabras)
+
+    return False
+
+
+def clasificar_derecho_vulnerado(hechos: str, pretensiones: str, derechos_vulnerados: str = "") -> Dict[str, any]:
+    """
+    Clasifica el tipo de derecho fundamental presuntamente vulnerado
+    según las reglas de subsidiariedad flexible de la Corte Constitucional
+
+    Args:
+        hechos: Narrativa de los hechos del caso
+        pretensiones: Lo que solicita el usuario
+        derechos_vulnerados: Derechos identificados (opcional)
+
+    Returns:
+        Dict con estructura:
+        {
+            "clasificacion": "CRITICO_URGENTE" | "ADMINISTRATIVO" | "MIXTO",
+            "derechos_detectados": [...],
+            "requiere_proteccion_inmediata": bool,
+            "debe_preguntar_derecho_peticion_previo": bool,
+            "justificacion": str
+        }
+    """
+    texto_completo = f"{hechos} {pretensiones} {derechos_vulnerados}".lower()
+
+    derechos_detectados = []
+    es_critico = False
+
+    # Detectar derechos críticos urgentes
+    if detectar_palabras_clave("vida", texto_completo):
+        derechos_detectados.append("Derecho a la vida (Art. 11 C.P.)")
+        es_critico = True
+
+    if detectar_palabras_clave("salud_urgente", texto_completo):
+        derechos_detectados.append("Derecho a la salud (Art. 49 C.P.)")
+        es_critico = True
+
+    if detectar_palabras_clave("educacion_critica", texto_completo):
+        derechos_detectados.append("Derecho a la educación (Art. 67 C.P.)")
+        es_critico = True
+
+    if detectar_palabras_clave("minimo_vital", texto_completo):
+        derechos_detectados.append("Derecho al mínimo vital (conexo con Art. 1 C.P.)")
+        es_critico = True
+
+    if detectar_palabras_clave("dignidad_humana", texto_completo):
+        derechos_detectados.append("Derecho a la dignidad humana (Art. 1 C.P.)")
+        es_critico = True
+
+    # Detectar derechos administrativos
+    es_administrativo = False
+    if detectar_palabras_clave("peticion", texto_completo):
+        derechos_detectados.append("Derecho de petición (Art. 23 C.P.)")
+        es_administrativo = True
+
+    if detectar_palabras_clave("habeas_data", texto_completo):
+        derechos_detectados.append("Derecho de habeas data (Art. 15 C.P.)")
+        es_administrativo = True
+
+    if detectar_palabras_clave("administrativo", texto_completo):
+        es_administrativo = True
+
+    # Clasificación final
+    if es_critico and not es_administrativo:
+        return {
+            "clasificacion": "CRITICO_URGENTE",
+            "derechos_detectados": derechos_detectados,
+            "requiere_proteccion_inmediata": True,
+            "debe_preguntar_derecho_peticion_previo": False,
+            "justificacion": "Caso involucra derechos fundamentales que requieren protección inmediata. La espera del término legal del derecho de petición (15 días) podría hacer ineficaz la protección o agravar el daño. Procede tutela directamente."
+        }
+
+    elif es_administrativo and not es_critico:
+        return {
+            "clasificacion": "ADMINISTRATIVO",
+            "derechos_detectados": derechos_detectados,
+            "requiere_proteccion_inmediata": False,
+            "debe_preguntar_derecho_peticion_previo": True,
+            "justificacion": "Caso relacionado principalmente con solicitudes administrativas que pueden ser protegidas eficazmente mediante derecho de petición. Debe verificarse agotamiento de vía administrativa."
+        }
+
+    elif es_critico and es_administrativo:
+        return {
+            "clasificacion": "MIXTO",
+            "derechos_detectados": derechos_detectados,
+            "requiere_proteccion_inmediata": True,
+            "debe_preguntar_derecho_peticion_previo": False,
+            "justificacion": "Aunque involucra aspecto administrativo, la urgencia del derecho fundamental crítico prevalece. Aplica subsidiariedad flexible por conexidad con vida, salud o dignidad humana."
+        }
+
+    else:
+        # No se detectaron palabras clave claras
+        return {
+            "clasificacion": "INDETERMINADO",
+            "derechos_detectados": [],
+            "requiere_proteccion_inmediata": False,
+            "debe_preguntar_derecho_peticion_previo": True,
+            "justificacion": "No se detectaron palabras clave claras. Se recomienda verificar si hubo derecho de petición previo y evaluar subsidiariedad caso por caso."
+        }

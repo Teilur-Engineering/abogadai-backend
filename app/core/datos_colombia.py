@@ -351,3 +351,35 @@ def buscar_entidad(termino: str):
                 })
 
     return resultados
+
+
+# Normativa Legal Colombiana Relevante
+NORMATIVA_DERECHO_PETICION = {
+    "ley_principal": {
+        "nombre": "Ley 1755 de 2015",
+        "fecha": "30 de junio de 2015",
+        "titulo": "Por medio de la cual se regula el Derecho Fundamental de Petición y se sustituye un título del Código de Procedimiento Administrativo y de lo Contencioso Administrativo",
+        "descripcion": "Norma específica que regula el Derecho Fundamental de Petición en Colombia, sustituye los capítulos sobre derecho de petición de la Ley 1437 de 2011",
+        "alcance": "Establece que toda persona tiene derecho a presentar peticiones respetuosas a las autoridades y a obtener pronta resolución completa y de fondo",
+        "plazos": {
+            "general": "15 días hábiles para resolver peticiones generales",
+            "informacion": "10 días hábiles para documentos e información específica"
+        },
+        "caracteristicas": [
+            "Permite peticiones verbales o escritas sin requisitos formales excesivos",
+            "Garantiza gratuidad del trámite",
+            "No requiere representación legal obligatoria",
+            "Aplica ante autoridades públicas y entidades privadas para garantizar derechos fundamentales"
+        ]
+    },
+    "codigo_procedimiento": {
+        "nombre": "Ley 1437 de 2011",
+        "titulo": "Código de Procedimiento Administrativo y de lo Contencioso Administrativo",
+        "descripcion": "Código general de procedimiento administrativo (norma complementaria)",
+        "nota": "Sus capítulos sobre derecho de petición fueron sustituidos por la Ley 1755 de 2015"
+    },
+    "fundamento_constitucional": {
+        "articulo": "Artículo 23 de la Constitución Política de Colombia",
+        "texto": "Toda persona tiene derecho a presentar peticiones respetuosas a las autoridades por motivos de interés general o particular y a obtener pronta resolución."
+    }
+}

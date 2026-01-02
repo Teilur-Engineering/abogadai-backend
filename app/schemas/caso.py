@@ -1,7 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class TipoDocumentoEnum(str, Enum):
@@ -89,6 +92,35 @@ class CasoResponse(CasoBase):
     created_at: datetime
     updated_at: datetime
 
+    @field_validator('tipo_documento', mode='before')
+    @classmethod
+    def validate_tipo_documento(cls, v):
+        """
+        Validador para asegurar correcta conversión del Enum de SQLAlchemy a Pydantic
+        """
+        if v is None:
+            return TipoDocumentoEnum.TUTELA
+
+        if isinstance(v, TipoDocumentoEnum):
+            return v
+
+        if hasattr(v, 'value'):
+            valor_str = v.value
+        elif isinstance(v, str):
+            valor_str = v
+        else:
+            return TipoDocumentoEnum.TUTELA
+
+        try:
+            if valor_str == "TUTELA":
+                return TipoDocumentoEnum.TUTELA
+            elif valor_str == "DERECHO_PETICION":
+                return TipoDocumentoEnum.DERECHO_PETICION
+            else:
+                return TipoDocumentoEnum.TUTELA
+        except Exception:
+            return TipoDocumentoEnum.TUTELA
+
     class Config:
         from_attributes = True
 
@@ -109,6 +141,35 @@ class CasoListResponse(BaseModel):
     comentario_admin_reembolso: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    @field_validator('tipo_documento', mode='before')
+    @classmethod
+    def validate_tipo_documento(cls, v):
+        """
+        Validador para asegurar correcta conversión del Enum de SQLAlchemy a Pydantic
+        """
+        if v is None:
+            return TipoDocumentoEnum.TUTELA
+
+        if isinstance(v, TipoDocumentoEnum):
+            return v
+
+        if hasattr(v, 'value'):
+            valor_str = v.value
+        elif isinstance(v, str):
+            valor_str = v
+        else:
+            return TipoDocumentoEnum.TUTELA
+
+        try:
+            if valor_str == "TUTELA":
+                return TipoDocumentoEnum.TUTELA
+            elif valor_str == "DERECHO_PETICION":
+                return TipoDocumentoEnum.DERECHO_PETICION
+            else:
+                return TipoDocumentoEnum.TUTELA
+        except Exception:
+            return TipoDocumentoEnum.TUTELA
 
     class Config:
         from_attributes = True

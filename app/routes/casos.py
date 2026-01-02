@@ -124,7 +124,7 @@ async def marcar_casos_vistos(
     db: Session = Depends(get_db)
 ):
     """
-    ✅ Marca todos los casos del usuario como vistos
+    Marca todos los casos del usuario como vistos
 
     Se ejecuta al entrar a la página "Mis Casos"
     """
@@ -136,8 +136,6 @@ async def marcar_casos_vistos(
         ).update({"visto_por_usuario": True})
 
         db.commit()
-
-        logger.info(f"✅ Marcados {casos_actualizados} casos como vistos - Usuario: {current_user.email}")
 
         return {
             "success": True,
@@ -400,10 +398,6 @@ def procesar_transcripcion(
     Procesa la transcripción de la conversación con IA y extrae datos estructurados
     para autollenar los campos del caso (hechos, derechos vulnerados, entidad, pretensiones).
     """
-    # 🔍 LOG: Inicio del procesamiento
-    logger.info(f"🤖 POST /casos/{caso_id}/procesar-transcripcion - Iniciando procesamiento")
-    logger.info(f"   Usuario: {current_user.email}")
-
     caso = db.query(Caso).filter(
         Caso.id == caso_id,
         Caso.user_id == current_user.id
@@ -416,47 +410,20 @@ def procesar_transcripcion(
             detail="Caso no encontrado"
         )
 
-    logger.info(f"✅ Caso {caso_id} encontrado - Estado: {caso.estado}")
-
-    # 🔍 LOG: Consulta de mensajes
-    logger.info(f"🔍 Buscando mensajes del caso {caso_id}...")
-
     # Obtener todos los mensajes del caso ordenados por timestamp
     mensajes = db.query(Mensaje).filter(
         Mensaje.caso_id == caso_id
     ).order_by(Mensaje.timestamp.asc()).all()
 
-    # 🔍 LOG: Resultado de la consulta
-    logger.info(f"📊 Mensajes encontrados: {len(mensajes)}")
-
     if not mensajes:
-        logger.warning(f"⚠️ NO HAY MENSAJES EN EL CASO {caso_id}")
-        logger.warning(f"   Room name: {caso.room_name}")
-        logger.warning(f"   Estado actual: {caso.estado}")
-        logger.warning(f"   Fecha inicio: {caso.fecha_inicio_sesion}")
-        logger.warning(f"   Marcando caso como ABANDONADO...")
-
         # Marcar el caso como abandonado
         caso.estado = EstadoCaso.ABANDONADO
         db.commit()
-
-        logger.info(f"✅ Caso {caso_id} marcado como ABANDONADO")
-        logger.info(f"   Revisar logs del AGENTE para diagnóstico:")
-        logger.info(f"   - Buscar '✅ caso_id EXTRAÍDO EXITOSAMENTE'")
-        logger.info(f"   - Buscar '💾 Guardando mensaje'")
-        logger.info(f"   - Buscar '✅ Mensaje guardado'")
 
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Sesión abandonada sin mensajes. Revisa los logs del agente."
         )
-
-    # 🔍 LOG: Detalles de los mensajes
-    logger.info(f"📝 Detalles de los mensajes:")
-    for i, msg in enumerate(mensajes[:5], 1):  # Mostrar solo los primeros 5
-        logger.info(f"   [{i}] {msg.remitente}: '{msg.texto[:50]}...' (ID: {msg.id})")
-    if len(mensajes) > 5:
-        logger.info(f"   ... y {len(mensajes) - 5} mensajes más")
 
     try:
         # Convertir mensajes a formato para el servicio de IA
@@ -469,67 +436,70 @@ def procesar_transcripcion(
             for msg in mensajes
         ]
 
-        logger.info(f"🧠 Llamando a GPT-4o para extraer datos...")
-
         # Extraer datos con IA
         datos_extraidos = openai_service.extraer_datos_conversacion(mensajes_formateados)
 
-        # 🔍 LOG: Datos extraídos completos (para debugging)
-        logger.info(f"✅ Datos extraídos exitosamente - DUMP COMPLETO:")
-        import json
-        logger.info(json.dumps(datos_extraidos, indent=2, ensure_ascii=False))
+        # Detección automática de urgencia
+        from ..core.validation_helper import clasificar_derecho_vulnerado
 
-        # 🔍 LOG: Resumen de datos extraídos
-        logger.info(f"\n📊 RESUMEN DE EXTRACCIÓN:")
-        logger.info(f"   Tipo documento original: {datos_extraidos.get('tipo_documento', 'tutela').upper()}")
-        logger.info(f"   ℹ️ DATOS DEL SOLICITANTE: Ya vienen del perfil del usuario (no se extraen)")
-        logger.info(f"   Hechos: {'✅ Extraído' if datos_extraidos.get('hechos') else '❌ Vacío'}")
-        logger.info(f"   Derechos vulnerados: {'✅ Extraído' if datos_extraidos.get('derechos_vulnerados') else '❌ Vacío'}")
-        logger.info(f"   Entidad accionada: {'✅ ' + str(datos_extraidos.get('entidad_accionada', '')) if datos_extraidos.get('entidad_accionada') else '❌ Vacío'}")
-        logger.info(f"   Dirección entidad: {'✅ Extraído' if datos_extraidos.get('direccion_entidad') else '❌ Vacío'}")
-        logger.info(f"   Pretensiones: {'✅ Extraído' if datos_extraidos.get('pretensiones') else '❌ Vacío'}")
-        logger.info(f"   Fundamentos: {'✅ Extraído' if datos_extraidos.get('fundamentos_derecho') else '❌ Vacío'}")
-        logger.info(f"   Pruebas: {'✅ Extraído' if datos_extraidos.get('pruebas') else '❌ Vacío'}")
-        logger.info(f"   Actúa en representación: {datos_extraidos.get('actua_en_representacion', False)}")
-        logger.info(f"   Hubo derecho petición previo: {datos_extraidos.get('hubo_derecho_peticion_previo', False)}")
+        hechos_extraidos = datos_extraidos.get('hechos', '')
+        pretensiones_extraidas = datos_extraidos.get('pretensiones', '')
+        derechos_extraidos = datos_extraidos.get('derechos_vulnerados', '')
 
-        # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD
-        logger.info(f"\n⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (Art. 86 C.P.):")
-        tiene_perjuicio = datos_extraidos.get('tiene_perjuicio_irremediable', False)
-        es_procedente = datos_extraidos.get('es_procedente_tutela', False)
-        tipo_recomendado = datos_extraidos.get('tipo_documento_recomendado', 'derecho_peticion')
+        clasificacion = clasificar_derecho_vulnerado(
+            hechos=hechos_extraidos or '',
+            pretensiones=pretensiones_extraidas or '',
+            derechos_vulnerados=derechos_extraidos or ''
+        )
 
-        logger.info(f"   Tiene perjuicio irremediable: {'✅ SÍ' if tiene_perjuicio else '❌ NO'}")
-        logger.info(f"   Es procedente tutela: {'✅ SÍ' if es_procedente else '❌ NO'}")
-        logger.info(f"   Tipo documento RECOMENDADO: {tipo_recomendado.upper()}")
+        # Si la detección automática encontró un caso CRÍTICO_URGENTE,
+        # sobrescribir/completar los campos de subsidiariedad
+        if clasificacion['clasificacion'] in ['CRITICO_URGENTE', 'MIXTO']:
+            datos_extraidos['tiene_perjuicio_irremediable'] = True
+            datos_extraidos['es_procedente_tutela'] = True
+            datos_extraidos['tipo_documento_recomendado'] = 'TUTELA'
+            if not datos_extraidos.get('razon_tipo_documento'):
+                datos_extraidos['razon_tipo_documento'] = clasificacion['justificacion']
 
-        if not es_procedente:
-            razon_improcedencia = datos_extraidos.get('razon_improcedencia', 'No especificada')
-            logger.info(f"   ⚠️ RAZÓN DE IMPROCEDENCIA: {razon_improcedencia}")
-            logger.info(f"   🔄 Se usará tipo: {tipo_recomendado}")
-        else:
-            logger.info(f"   ✅ Cumple requisitos de subsidiariedad")
-            razon = datos_extraidos.get('razon_tipo_documento', '')
-            logger.info(f"   📝 Razón: {razon}")
+        # Si es ADMINISTRATIVO, asegurar que los campos estén marcados correctamente
+        elif clasificacion['clasificacion'] == 'ADMINISTRATIVO':
+            if datos_extraidos.get('es_procedente_tutela') is None or 'es_procedente_tutela' not in datos_extraidos:
+                datos_extraidos['es_procedente_tutela'] = False
+                datos_extraidos['tiene_perjuicio_irremediable'] = False
+                if not datos_extraidos.get('tipo_documento_recomendado'):
+                    datos_extraidos['tipo_documento_recomendado'] = 'DERECHO_PETICION'
+
+        # Si es INDETERMINADO, default a DERECHO_PETICION por subsidiariedad
+        elif clasificacion['clasificacion'] == 'INDETERMINADO':
+            if datos_extraidos.get('es_procedente_tutela') is None or 'es_procedente_tutela' not in datos_extraidos:
+                datos_extraidos['es_procedente_tutela'] = False
+                datos_extraidos['tiene_perjuicio_irremediable'] = False
+                if not datos_extraidos.get('tipo_documento_recomendado'):
+                    datos_extraidos['tipo_documento_recomendado'] = 'DERECHO_PETICION'
+
+        # Garantizar que SIEMPRE existan los campos críticos de subsidiariedad
+        if 'es_procedente_tutela' not in datos_extraidos or datos_extraidos.get('es_procedente_tutela') is None:
+            datos_extraidos['es_procedente_tutela'] = False
+
+        if 'tiene_perjuicio_irremediable' not in datos_extraidos or datos_extraidos.get('tiene_perjuicio_irremediable') is None:
+            datos_extraidos['tiene_perjuicio_irremediable'] = False
+
+        if 'tipo_documento_recomendado' not in datos_extraidos or not datos_extraidos.get('tipo_documento_recomendado'):
+            datos_extraidos['tipo_documento_recomendado'] = 'DERECHO_PETICION'
 
         # 🎯 NUEVA LÓGICA: Actualizar el caso con TODOS los datos extraídos
         # Incluso si están vacíos, mal formateados o incompletos
         # Las validaciones mostrarán advertencias en el formulario, pero no bloquean el auto-llenado
         campos_actualizados = []
 
-        # ⚖️ Actualizar tipo_documento usando el RECOMENDADO (respeta subsidiariedad)
-        # La IA ya validó si procede tutela o debe ser derecho de petición
+        # Actualizar tipo_documento usando el RECOMENDADO
         if datos_extraidos.get('tipo_documento_recomendado'):
             tipo_doc = datos_extraidos['tipo_documento_recomendado']
-            tipo_anterior = caso.tipo_documento.value if caso.tipo_documento else 'ninguno'
 
             if tipo_doc == 'tutela':
                 caso.tipo_documento = TipoDocumento.TUTELA
             elif tipo_doc == 'derecho_peticion':
                 caso.tipo_documento = TipoDocumento.DERECHO_PETICION
-
-            if tipo_anterior != tipo_doc:
-                logger.info(f"   🔄 Tipo de documento cambiado: {tipo_anterior} → {tipo_doc}")
 
             campos_actualizados.append('tipo_documento')
 
@@ -597,7 +567,7 @@ def procesar_transcripcion(
             caso.tipo_representado = datos_extraidos['tipo_representado']
             campos_actualizados.append('tipo_representado')
 
-        # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (nuevos campos)
+        # Validación de subsidiariedad
         if 'hubo_derecho_peticion_previo' in datos_extraidos:
             caso.hubo_derecho_peticion_previo = datos_extraidos['hubo_derecho_peticion_previo']
             campos_actualizados.append('hubo_derecho_peticion_previo')
@@ -618,13 +588,8 @@ def procesar_transcripcion(
             caso.razon_improcedencia = datos_extraidos['razon_improcedencia']
             campos_actualizados.append('razon_improcedencia')
 
-        logger.info(f"💾 Guardando cambios en la base de datos...")
-        logger.info(f"   Campos actualizados ({len(campos_actualizados)}): {', '.join(campos_actualizados) if campos_actualizados else 'Ninguno'}")
-
         db.commit()
         db.refresh(caso)
-
-        logger.info(f"✅ Caso {caso_id} actualizado exitosamente")
 
         return caso
 
@@ -661,25 +626,32 @@ def generar_documento(
             detail="Caso no encontrado"
         )
 
-    # ⚖️ VALIDACIÓN DE SUBSIDIARIEDAD (Art. 86 C.P. - Decreto 2591/1991)
-    # Si es tutela, validar subsidiariedad y cambiar a derecho de petición si no cumple
-    if caso.tipo_documento and caso.tipo_documento.value == "TUTELA":
-        logger.info(f"⚖️ Validando subsidiariedad para tutela del caso {caso_id}...")
+    # Sincronización de tipo de documento
+    tipo_cambio = False
 
+    # Si la IA determinó que es procedente tutela, el tipo debe ser TUTELA
+    if caso.es_procedente_tutela is True:
+        if caso.tipo_documento != TipoDocumento.TUTELA:
+            caso.tipo_documento = TipoDocumento.TUTELA
+            tipo_cambio = True
+
+    # Si la IA determinó que NO es procedente tutela, el tipo debe ser DERECHO_PETICION
+    elif caso.es_procedente_tutela is False:
+        if caso.tipo_documento != TipoDocumento.DERECHO_PETICION:
+            caso.tipo_documento = TipoDocumento.DERECHO_PETICION
+            tipo_cambio = True
+
+    if tipo_cambio:
+        db.commit()
+        db.refresh(caso)
+
+    # Validación de subsidiariedad
+    if caso.tipo_documento and caso.tipo_documento.value == "TUTELA":
         # Verificar si es_procedente_tutela fue evaluado y es False
         if caso.es_procedente_tutela is False:
-            logger.warning(f"❌ Tutela NO procede - No cumple subsidiariedad")
-            logger.warning(f"   Razón: {caso.razon_improcedencia or 'No especificada'}")
-            logger.warning(f"   Hubo derecho de petición previo: {caso.hubo_derecho_peticion_previo}")
-            logger.warning(f"   Tiene perjuicio irremediable: {caso.tiene_perjuicio_irremediable}")
-
-            # 🔄 CAMBIO AUTOMÁTICO: En lugar de bloquear, cambiar a DERECHO DE PETICIÓN
-            logger.info(f"🔄 Cambiando automáticamente a DERECHO DE PETICIÓN...")
+            # Cambio automático a DERECHO DE PETICIÓN
             caso.tipo_documento = TipoDocumento.DERECHO_PETICION
             db.commit()
-            logger.info(f"✅ Documento cambiado a DERECHO DE PETICIÓN - Continuando con generación")
-        else:
-            logger.info(f"✅ Tutela cumple subsidiariedad - Puede generarse")
 
     # 🔍 VALIDACIÓN ESTRICTA: Validar campos críticos según tipo de documento
     from ..core.validation_helper import validar_caso_completo
@@ -733,13 +705,11 @@ def generar_documento(
         caso.documento_generado = documento_generado
         caso.estado = EstadoCaso.GENERADO
 
-        # 📅 NUEVO - Calcular fecha de vencimiento (14 días desde ahora)
+        # Calcular fecha de vencimiento (14 días desde ahora)
         caso.fecha_vencimiento = datetime.utcnow() + timedelta(days=14)
 
         db.commit()
         db.refresh(caso)
-
-        logger.info(f"✅ Documento generado exitosamente - Vence: {caso.fecha_vencimiento}")
 
         return caso
 
@@ -757,9 +727,9 @@ def simular_pago(
     db: Session = Depends(get_db)
 ):
     """
-    🧪 SIMULADOR DE PAGO (DESARROLLO)
+    Simulador de pago (desarrollo)
 
-    NUEVA LÓGICA - Sistema de Niveles y Beneficios:
+    Sistema de Niveles y Beneficios:
     1. Crea registro en tabla pagos
     2. Desbloquea documento
     3. Actualiza nivel del usuario
@@ -768,7 +738,6 @@ def simular_pago(
 
     En producción se reemplazará por integración con pasarela de pago real.
     """
-    logger.info(f"🧪 POST /casos/{caso_id}/simular-pago - Usuario: {current_user.email}")
 
     caso = db.query(Caso).filter(
         Caso.id == caso_id,
@@ -788,7 +757,6 @@ def simular_pago(
         )
 
     if caso.documento_desbloqueado:
-        logger.warning(f"⚠️ Documento ya estaba desbloqueado desde {caso.fecha_pago}")
         # Retornar info del pago existente
         return {
             "success": True,
@@ -798,17 +766,12 @@ def simular_pago(
         }
 
     try:
-        # 💳 CREAR PAGO Y PROCESAR BENEFICIOS
+        # Crear pago y procesar beneficios
         monto = 50000  # Precio en COP
         pago = pago_service.crear_pago_simulado(current_user.id, caso_id, monto, db)
 
         # Refrescar caso para obtener cambios
         db.refresh(caso)
-
-        logger.info(f"✅ Pago procesado exitosamente")
-        logger.info(f"   💰 Monto: ${monto} COP")
-        logger.info(f"   📈 Nivel actualizado")
-        logger.info(f"   🎁 +2 sesiones extra desbloqueadas")
 
         # Obtener beneficios procesados
         from ..services import nivel_service
@@ -982,7 +945,7 @@ async def solicitar_reembolso(
     db: Session = Depends(get_db)
 ):
     """
-    💸 NUEVO - Solicita reembolso por rechazo legal
+    Solicita reembolso por rechazo legal
 
     El usuario puede subir evidencia del rechazo (documento oficial) - OPCIONAL
     Solo aplica si el documento fue rechazado legalmente (tutela/derecho petición)
@@ -992,7 +955,6 @@ async def solicitar_reembolso(
     - Debe proporcionar motivo del rechazo
     - Evidencia es opcional (recomendada)
     """
-    logger.info(f"💸 POST /casos/{caso_id}/solicitar-reembolso - Usuario: {current_user.email}")
 
     # Verificar que el caso existe y pertenece al usuario
     caso = db.query(Caso).filter(
@@ -1035,13 +997,9 @@ async def solicitar_reembolso(
                 buffer.write(content)
 
             evidencia_url = f"/{file_path}"
-            logger.info(f"   📄 Evidencia guardada: {evidencia_url}")
 
         # Registrar solicitud de reembolso
         resultado = pago_service.solicitar_reembolso(caso_id, motivo, evidencia_url, db)
-
-        logger.info(f"✅ Solicitud de reembolso registrada")
-        logger.info(f"   📄 Evidencia guardada: {evidencia_url}")
 
         return {
             "success": True,
@@ -1069,12 +1027,11 @@ async def obtener_historial_pagos(
     db: Session = Depends(get_db)
 ):
     """
-    📜 NUEVO - Retorna historial de pagos del usuario
+    Retorna historial de pagos del usuario
 
     Incluye todos los pagos (exitosos, fallidos, reembolsados)
     con información del caso asociado
     """
-    logger.info(f"📜 GET /casos/historial-pagos - Usuario: {current_user.email}")
 
     try:
         pagos = pago_service.obtener_pagos_usuario(current_user.id, db)

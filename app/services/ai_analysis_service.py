@@ -155,8 +155,8 @@ ANALIZA SEGÚN LOS CRITERIOS DE DERECHO DE PETICIÓN:
 3. **Datos**: ¿Incluye todos los datos del solicitante y la entidad destinataria?
 4. **Lenguaje**: ¿Usa lenguaje formal y respetuoso apropiado para un derecho de petición?
 5. **Fundamentos jurídicos**:
-   - ¿Cita el Art. 23 C.P. y la Ley 1437 de 2011?
-   - ¿Menciona el término de 15 días hábiles (Art. 14 Ley 1437)?
+   - ¿Cita el Art. 23 C.P. y la Ley 1755 de 2015?
+   - ¿Menciona el término de 15 días hábiles (Ley 1755 de 2015)?
    - Si aplica, ¿cita normas especiales para sujetos de protección (menores Art. 44, adultos mayores Art. 46, personas con discapacidad Art. 47)?
 6. **Peticiones numeradas y claras**:
    - ¿Las peticiones están numeradas (PRIMERO, SEGUNDO, TERCERO, etc.)?
@@ -171,7 +171,7 @@ Responde en formato JSON:
     "coherencia": {{"puntos": 0-15, "comentario": "texto"}},
     "datos": {{"puntos": 0-15, "comentario": "texto"}},
     "lenguaje": {{"puntos": 0-15, "comentario": "texto"}},
-    "fundamentos_juridicos": {{"puntos": 0-15, "comentario": "texto", "cita_art23": true/false, "cita_ley1437": true/false, "menciona_plazo_15dias": true/false}},
+    "fundamentos_juridicos": {{"puntos": 0-15, "comentario": "texto", "cita_art23": true/false, "cita_ley1755": true/false, "menciona_plazo_15dias": true/false}},
     "peticiones_numeradas": {{"puntos": 0-15, "comentario": "texto", "estan_numeradas": true/false, "son_especificas": true/false}},
     "completitud": {{"puntos": 0-10, "comentario": "texto"}},
     "problemas_encontrados": ["lista de problemas"],
@@ -297,7 +297,7 @@ ANALIZA:
 3. **Competencia de la entidad**: ¿Es la entidad correcta para atender esta petición?
 4. **Hechos claros**: ¿Los hechos están bien descritos y son relevantes?
 5. **Especificidad**: ¿La petición es específica y accionable?
-6. **Fundamentos**: ¿Se mencionan los fundamentos legales (Art. 23 C.P., Ley 1437)?
+6. **Fundamentos**: ¿Se mencionan los fundamentos legales (Art. 23 C.P., Ley 1755 de 2015)?
 
 Responde en formato JSON:
 {{

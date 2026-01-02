@@ -237,7 +237,7 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
    PETICIONARIO: [Nombre completo del solicitante]
    ASUNTO: [Breve descripción del objeto de la petición]
 
-   [Nombre completo del solicitante], identificado(a) como aparece al pie de mi firma, {f'actuando en calidad de {datos_caso.get("relacion_representado", "representante legal")} de {datos_caso.get("nombre_representado", "")},' if datos_caso.get('actua_en_representacion', False) else 'actuando en nombre propio,'} respetuosamente me dirijo a usted para presentar DERECHO DE PETICIÓN, con fundamento en el artículo 23 de la Constitución Política de Colombia y la Ley 1437 de 2011, con base en lo siguiente:
+   [Nombre completo del solicitante], identificado(a) como aparece al pie de mi firma, {f'actuando en calidad de {datos_caso.get("relacion_representado", "representante legal")} de {datos_caso.get("nombre_representado", "")},' if datos_caso.get('actua_en_representacion', False) else 'actuando en nombre propio,'} respetuosamente me dirijo a usted para presentar DERECHO DE PETICIÓN, con fundamento en el artículo 23 de la Constitución Política de Colombia y la Ley 1755 de 2015, con base en lo siguiente:
 
 2. ESTRUCTURA REQUERIDA (usar NUMERACIÓN ROMANA):
 
@@ -253,14 +253,15 @@ INSTRUCCIONES PARA FORMATO PROFESIONAL:
    **III. FUNDAMENTOS DE DERECHO**
    FORMATO DE PÁRRAFO: Redacta los fundamentos legales en párrafos corridos bien argumentados.
    Integra de forma narrativa:
-   - Art. 23 de la Constitución Política de Colombia
-   - Ley 1437 de 2011 (Código de Procedimiento Administrativo y de lo Contencioso Administrativo)
+   - Art. 23 de la Constitución Política de Colombia (fundamento constitucional)
+   - Ley 1755 de 2015 "Por medio de la cual se regula el Derecho Fundamental de Petición" (norma principal y específica)
    - Menciona el término de respuesta dentro del texto argumentativo:
-     * 15 días hábiles (Art. 14 Ley 1437) para peticiones generales
-     * 10 días hábiles (Art. 14 Ley 1437) cuando se solicitan documentos o información específica
+     * 15 días hábiles (Ley 1755 de 2015) para peticiones generales
+     * 10 días hábiles (Ley 1755 de 2015) cuando se solicitan documentos o información específica
    - Si involucra menores de edad: cita el Art. 44 C.P. y menciona el interés superior del menor en el texto
    - Si involucra adultos mayores: cita el Art. 46 C.P. dentro de la argumentación
    - Si involucra personas con discapacidad: cita el Art. 47 C.P. integrado en el texto
+   IMPORTANTE: La Ley 1755 de 2015 es la norma específica que regula el derecho de petición y sustituye los capítulos respectivos de la Ley 1437 de 2011.
    NO uses listas de viñetas, desarrolla una argumentación legal coherente en prosa profesional.
 
    **IV. PETICIONES**
@@ -386,11 +387,55 @@ Enfócate ÚNICAMENTE en extraer:
 
 1. **tipo_documento**: Determina el tipo de documento legal apropiado según la conversación.
 
-   ⚖️ PRINCIPIO LEGAL CLAVE: SUBSIDIARIEDAD DE LA TUTELA (Art. 86 C.P. y Decreto 2591/1991)
+   ⚖️ PRINCIPIO LEGAL CLAVE: SUBSIDIARIEDAD FLEXIBLE DE LA TUTELA (Art. 86 C.P. y Decreto 2591/1991)
    La tutela SOLO procede cuando NO existe otro medio de defensa judicial o cuando ya se agotó.
    Si no se cumple subsidiariedad, un juez rechazará la tutela de plano.
 
-   REGLAS DE DECISIÓN ESTRICTAS (APLICAR EN ESTE ORDEN):
+   🎯 REGLA GENERAL OBLIGATORIA (APLICAR PRIMERO):
+
+   ANTES de evaluar si hubo derecho de petición previo, debes IDENTIFICAR el tipo de derecho fundamental
+   presuntamente vulnerado y la urgencia de la protección.
+
+   📋 DETECCIÓN AUTOMÁTICA DE DERECHOS CRÍTICOS URGENTES:
+
+   SI detectas CUALQUIERA de estas palabras clave en la conversación:
+
+   **VIDA**: muerte, morir, fallecer, agonía, peligro de muerte, riesgo de muerte, mortal, terminal
+
+   **SALUD URGENTE**: cirugía, operación, urgente, emergencia, urgencias, medicamento crítico,
+   tratamiento vital, quimioterapia, diálisis, transfusión, dolor insoportable, cáncer, tumor,
+   infarto, derrame, insuficiencia, hospital, UCI, negaron cirugía, sin autorización médica
+
+   **EDUCACIÓN CRÍTICA**: no puede estudiar, expulsión, matrícula cancelada, sin cupo,
+   impedido de asistir, suspendido del colegio
+
+   **MÍNIMO VITAL**: sin dinero, hambre, indigencia, sin vivienda, desalojo, pensión vital,
+   sin ingresos, sin sustento
+
+   **DIGNIDAD HUMANA**: maltrato, tortura, tratos crueles, degradante, discriminación,
+   violencia, abuso
+
+   → ACCIÓN INMEDIATA:
+   - tipo_documento = "TUTELA"
+   - tiene_perjuicio_irremediable = true
+   - es_procedente_tutela = true
+   - razon_tipo_documento = "Procede tutela directamente. Caso involucra derechos fundamentales que requieren protección inmediata (vida/salud/dignidad humana). La espera del término legal del derecho de petición (15 días) podría hacer ineficaz la protección o agravar el daño."
+   - NO preguntes ni evalúes derecho de petición previo
+
+   📋 CASOS QUE SÍ REQUIEREN VERIFICAR DERECHO DE PETICIÓN PREVIO:
+
+   Solo si NO detectaste ninguna palabra clave de derechos críticos y el caso se relaciona con:
+   - Solicitud de información, certificados, copias
+   - Derecho de habeas data (datos personales, reportes crediticios)
+   - Trámites administrativos sin urgencia
+   - Solicitudes de respuesta institucional
+
+   → En estos casos SÍ debes verificar:
+   - ¿Hubo derecho de petición previo?
+   - ¿Se venció el término legal (15 días)?
+   - Evaluar tutela solo como mecanismo subsidiario
+
+   REGLAS DE DECISIÓN DETALLADAS (APLICAR DESPUÉS DE LA DETECCIÓN AUTOMÁTICA):
 
    ❌ DERECHO DE PETICIÓN OBLIGATORIO (subsidiariedad no cumplida):
    Si se cumplen TODAS estas condiciones:
