@@ -27,7 +27,8 @@ app = FastAPI(
 # Permitir frontend de producción y desarrollo
 allowed_origins = [
     settings.FRONTEND_URL,  # De .env (localhost en dev)
-    "https://abogadai-frontend.onrender.com",  # Producción
+    "https://abogadai-frontend.onrender.com",  # Producción Render
+    "https://app.abogadai.com",  # Dominio personalizado producción
     "http://localhost:5173",  # Desarrollo local
     "http://localhost:3000",  # Desarrollo alternativo
 ]
