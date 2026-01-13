@@ -59,9 +59,9 @@ class User(Base):
     def obtener_limites_sesion(self):
         """Retorna los límites de sesión según el nivel del usuario"""
         limites = {
-            0: {"sesiones_dia": 3, "min_sesion": 10, "min_totales": 30},
-            1: {"sesiones_dia": 5, "min_sesion": 10, "min_totales": 50},
-            2: {"sesiones_dia": 7, "min_sesion": 10, "min_totales": 70},
-            3: {"sesiones_dia": 10, "min_sesion": 15, "min_totales": None}  # Sin límite total
+            0: {"sesiones_dia": 3, "min_sesion": 15, "min_totales": None},  # 15 min universal
+            1: {"sesiones_dia": 5, "min_sesion": 15, "min_totales": None},  # 15 min universal
+            2: {"sesiones_dia": 7, "min_sesion": 15, "min_totales": None},  # 15 min universal
+            3: {"sesiones_dia": 10, "min_sesion": 15, "min_totales": None}  # 15 min universal
         }
         return limites.get(self.nivel_usuario, limites[0])

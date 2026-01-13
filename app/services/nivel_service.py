@@ -96,23 +96,23 @@ def obtener_limites_usuario(user_id: int, db: Session) -> dict:
     limites_por_nivel = {
         0: {  # FREE
             "sesiones_dia": 3,
-            "min_sesion": 10,
-            "min_totales": 30
+            "min_sesion": 15,  # 15 min universal para todos
+            "min_totales": None  # Sin límite de minutos totales
         },
         1: {  # BRONCE
             "sesiones_dia": 5,
-            "min_sesion": 10,
-            "min_totales": 50
+            "min_sesion": 15,  # 15 min universal para todos
+            "min_totales": None  # Sin límite de minutos totales
         },
         2: {  # PLATA
             "sesiones_dia": 7,
-            "min_sesion": 10,
-            "min_totales": 70
+            "min_sesion": 15,  # 15 min universal para todos
+            "min_totales": None  # Sin límite de minutos totales
         },
         3: {  # ORO
             "sesiones_dia": 10,
-            "min_sesion": 15,
-            "min_totales": None  # Sin límite total
+            "min_sesion": 15,  # 15 min universal para todos
+            "min_totales": None  # Sin límite de minutos totales
         }
     }
 

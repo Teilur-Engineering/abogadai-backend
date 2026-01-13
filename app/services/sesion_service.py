@@ -54,7 +54,7 @@ def puede_crear_sesion(user_id: int, db: Session) -> dict:
             "permitido": True,
             "razon": "Primera sesión del día",
             "sesiones_disponibles": limites["sesiones_dia"] + usuario.sesiones_extra_hoy,
-            "minutos_disponibles": limites["min_totales"] if limites["min_totales"] else 999999,
+            "minutos_disponibles": 999999,  # Sin límite de minutos totales
             "limite_minutos_sesion": limites["min_sesion"]
         }
 
@@ -68,31 +68,16 @@ def puede_crear_sesion(user_id: int, db: Session) -> dict:
             "permitido": False,
             "razon": f"Límite diario alcanzado ({total_permitidas} sesiones). Paga un documento para desbloquear +2 sesiones bonus.",
             "sesiones_disponibles": 0,
-            "minutos_disponibles": 0,
+            "minutos_disponibles": 999999,  # Sin límite de minutos
             "limite_minutos_sesion": limites["min_sesion"]
         }
 
-    # Validar límite de minutos totales del día (si aplica)
-    minutos_disponibles = 999999  # Sin límite por defecto
-
-    if limites["min_totales"] is not None:
-        minutos_disponibles = limites["min_totales"] - sesion_diaria.minutos_consumidos
-
-        if minutos_disponibles <= 0:
-            return {
-                "permitido": False,
-                "razon": f"Límite de minutos diarios alcanzado ({limites['min_totales']} min). Vuelve mañana o paga para subir de nivel.",
-                "sesiones_disponibles": sesiones_disponibles,
-                "minutos_disponibles": 0,
-                "limite_minutos_sesion": limites["min_sesion"]
-            }
-
-    # Todo OK - puede crear sesión
+    # Todo OK - puede crear sesión (sin validar minutos totales)
     return {
         "permitido": True,
         "razon": "OK",
         "sesiones_disponibles": sesiones_disponibles,
-        "minutos_disponibles": minutos_disponibles,
+        "minutos_disponibles": 999999,  # Sin límite de minutos totales
         "limite_minutos_sesion": limites["min_sesion"]
     }
 
