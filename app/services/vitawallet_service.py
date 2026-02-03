@@ -119,20 +119,23 @@ class VitaWalletService:
         Construye las URLs de redirección para después del pago
 
         Vita redirige al usuario según el resultado:
-        - success: Pago completado
+        - success: Pago completado (redirige directo al caso)
         - cancel: Usuario canceló
         - error: Error en el proceso
         - pending: Pago pendiente de confirmación
 
-        NOTA: Las rutas del frontend están bajo /app/casos, no /casos
+        Redirigimos directamente al caso para mostrar estado de verificación
         """
-        base = f"{settings.FRONTEND_URL}/app/casos"
+        caso_url = f"{settings.FRONTEND_URL}/app/tutela/{caso_id}"
+        casos_url = f"{settings.FRONTEND_URL}/app/casos"
 
         return {
-            "success_redirect_url": f"{base}?pago=exitoso&caso_id={caso_id}",
-            "cancel_redirect_url": f"{base}?pago=cancelado&caso_id={caso_id}",
-            "error_redirect_url": f"{base}?pago=error&caso_id={caso_id}",
-            "pending_redirect_url": f"{base}?pago=pendiente&caso_id={caso_id}"
+            # Exitoso y pendiente van directo al caso para verificar/mostrar documento
+            "success_redirect_url": f"{caso_url}?mode=view&pago=exitoso",
+            "pending_redirect_url": f"{caso_url}?mode=view&pago=pendiente",
+            # Cancelado y error van a la lista de casos
+            "cancel_redirect_url": f"{casos_url}?pago=cancelado&caso_id={caso_id}",
+            "error_redirect_url": f"{casos_url}?pago=error&caso_id={caso_id}",
         }
 
     async def crear_payment_order(
