@@ -124,15 +124,15 @@ class VitaWalletService:
         - error: Error en el proceso
         - pending: Pago pendiente de confirmación
 
-        Redirigimos directamente al caso para mostrar estado de verificación
+        El frontend detecta automáticamente que es modo vista si hay casoId
         """
         caso_url = f"{settings.FRONTEND_URL}/app/tutela/{caso_id}"
         casos_url = f"{settings.FRONTEND_URL}/app/casos"
 
         return {
             # Exitoso y pendiente van directo al caso para verificar/mostrar documento
-            "success_redirect_url": f"{caso_url}?mode=view&pago=exitoso",
-            "pending_redirect_url": f"{caso_url}?mode=view&pago=pendiente",
+            "success_redirect_url": f"{caso_url}?pago=exitoso",
+            "pending_redirect_url": f"{caso_url}?pago=pendiente",
             # Cancelado y error van a la lista de casos
             "cancel_redirect_url": f"{casos_url}?pago=cancelado&caso_id={caso_id}",
             "error_redirect_url": f"{casos_url}?pago=error&caso_id={caso_id}",
