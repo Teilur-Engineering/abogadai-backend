@@ -123,14 +123,16 @@ class VitaWalletService:
         - cancel: Usuario canceló
         - error: Error en el proceso
         - pending: Pago pendiente de confirmación
+
+        NOTA: Las rutas del frontend están bajo /app/casos, no /casos
         """
-        base = f"{settings.FRONTEND_URL}/casos/{caso_id}"
+        base = f"{settings.FRONTEND_URL}/app/casos"
 
         return {
-            "success_redirect_url": f"{base}?pago=exitoso",
-            "cancel_redirect_url": f"{base}?pago=cancelado",
-            "error_redirect_url": f"{base}?pago=error",
-            "pending_redirect_url": f"{base}?pago=pendiente"
+            "success_redirect_url": f"{base}?pago=exitoso&caso_id={caso_id}",
+            "cancel_redirect_url": f"{base}?pago=cancelado&caso_id={caso_id}",
+            "error_redirect_url": f"{base}?pago=error&caso_id={caso_id}",
+            "pending_redirect_url": f"{base}?pago=pendiente&caso_id={caso_id}"
         }
 
     async def crear_payment_order(
