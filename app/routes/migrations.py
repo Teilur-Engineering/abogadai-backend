@@ -153,6 +153,36 @@ async def apply_migrations(
                 results["migrations_skipped"].append("visto_por_usuario ya existe")
                 logger.info("Campo 'visto_por_usuario' ya existe, saltando...")
 
+            # =========================================================
+            # MIGRACIÓN 4: Vita Wallet - Campo vita_public_code (29-ene-2026)
+            # =========================================================
+
+            # 4.1. Agregar campo vita_public_code a tabla pagos
+            if not column_exists(inspector, 'pagos', 'vita_public_code'):
+                logger.info("Agregando campo 'vita_public_code' a tabla pagos...")
+                conn.execute(text("""
+                    ALTER TABLE pagos
+                    ADD COLUMN vita_public_code VARCHAR(100)
+                """))
+                conn.commit()
+                results["migrations_applied"].append("vita_public_code agregado a pagos")
+                logger.info("Campo 'vita_public_code' agregado exitosamente")
+                # Refrescar inspector
+                inspector = inspect(engine)
+
+                # Crear índice para búsquedas rápidas por public_code
+                logger.info("Creando índice para vita_public_code...")
+                conn.execute(text("""
+                    CREATE INDEX IF NOT EXISTS idx_pagos_vita_public_code
+                    ON pagos(vita_public_code)
+                """))
+                conn.commit()
+                results["migrations_applied"].append("índice vita_public_code creado")
+                logger.info("Índice para 'vita_public_code' creado exitosamente")
+            else:
+                results["migrations_skipped"].append("vita_public_code ya existe en pagos")
+                logger.info("Campo 'vita_public_code' ya existe, saltando...")
+
             # Verificación final
             final_inspector = inspect(engine)
             final_columns = [col['name'] for col in final_inspector.get_columns('casos')]
@@ -183,29 +213,37 @@ async def get_migration_status() -> Dict[str, Any]:
     """
     try:
         inspector = inspect(engine)
-        columns = [col['name'] for col in inspector.get_columns('casos')]
+        casos_columns = [col['name'] for col in inspector.get_columns('casos')]
+        pagos_columns = [col['name'] for col in inspector.get_columns('pagos')]
 
-        required_columns = {
-            'ciudad_de_los_hechos': 'ciudad_de_los_hechos' in columns,
-            'documento_desbloqueado': 'documento_desbloqueado' in columns,
-            'fecha_pago': 'fecha_pago' in columns,
-            'visto_por_usuario': 'visto_por_usuario' in columns
+        required_columns_casos = {
+            'ciudad_de_los_hechos': 'ciudad_de_los_hechos' in casos_columns,
+            'documento_desbloqueado': 'documento_desbloqueado' in casos_columns,
+            'fecha_pago': 'fecha_pago' in casos_columns,
+            'visto_por_usuario': 'visto_por_usuario' in casos_columns
+        }
+
+        required_columns_pagos = {
+            'vita_public_code': 'vita_public_code' in pagos_columns
         }
 
         should_not_exist = {
-            'representante_legal': 'representante_legal' in columns
+            'representante_legal': 'representante_legal' in casos_columns
         }
 
         all_migrations_applied = (
-            all(required_columns.values()) and
+            all(required_columns_casos.values()) and
+            all(required_columns_pagos.values()) and
             not any(should_not_exist.values())
         )
 
         return {
             "all_migrations_applied": all_migrations_applied,
-            "required_columns": required_columns,
+            "required_columns_casos": required_columns_casos,
+            "required_columns_pagos": required_columns_pagos,
             "columns_that_should_not_exist": should_not_exist,
-            "all_columns": columns
+            "casos_columns": casos_columns,
+            "pagos_columns": pagos_columns
         }
 
     except Exception as e:

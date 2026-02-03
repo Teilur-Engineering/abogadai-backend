@@ -6,7 +6,7 @@ from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.database import engine, Base
-from app.routes import auth, livekit, casos, referencias, sesiones, mensajes, perfil, migrations, usuarios, admin
+from app.routes import auth, livekit, casos, referencias, sesiones, mensajes, perfil, migrations, usuarios, admin, webhooks
 import logging
 import os
 
@@ -99,6 +99,7 @@ app.include_router(perfil.router, prefix="/api")
 app.include_router(migrations.router)  # Endpoint temporal para migraciones
 app.include_router(usuarios.router)  # NUEVO - Endpoints de niveles y beneficios
 app.include_router(admin.router)  # NUEVO - Endpoints de administración
+app.include_router(webhooks.router)  # Vita Wallet - Webhooks de pago
 
 # Configurar carpeta de archivos estáticos para evidencias de reembolso
 uploads_dir = "uploads"
