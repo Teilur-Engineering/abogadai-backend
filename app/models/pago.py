@@ -7,18 +7,19 @@ from ..core.database import Base
 
 
 class EstadoPago(str, enum.Enum):
-    PENDIENTE = "pendiente"
-    EXITOSO = "exitoso"
-    FALLIDO = "fallido"
-    REEMBOLSADO = "reembolsado"
+    PENDIENTE = "PENDIENTE"
+    EXITOSO = "EXITOSO"
+    FALLIDO = "FALLIDO"
+    REEMBOLSADO = "REEMBOLSADO"
 
 
 class MetodoPago(str, enum.Enum):
-    SIMULADO = "simulado"
-    MERCADOPAGO = "mercadopago"
-    WOMPI = "wompi"
-    PSE = "pse"
-    TARJETA = "tarjeta"
+    SIMULADO = "SIMULADO"
+    VITA_WALLET = "VITA_WALLET"
+    MERCADOPAGO = "MERCADOPAGO"
+    WOMPI = "WOMPI"
+    PSE = "PSE"
+    TARJETA = "TARJETA"
 
 
 class Pago(Base):
@@ -39,6 +40,7 @@ class Pago(Base):
     # Referencias externas
     referencia_pago = Column(String(200), nullable=True, index=True)  # ID de la transacción en pasarela
     referencia_reembolso = Column(String(200), nullable=True)  # ID del reembolso en pasarela
+    vita_public_code = Column(String(100), nullable=True, index=True)  # UUID de orden en Vita Wallet
 
     # Fechas
     fecha_pago = Column(DateTime, nullable=True, index=True)  # Cuándo se completó el pago

@@ -7,11 +7,14 @@ import logging
 import os
 
 from ..core.database import get_db
+from ..core.config import settings
 from ..models.user import User
 from ..models.caso import Caso, EstadoCaso, TipoDocumento
 from ..models.mensaje import Mensaje
+from ..models.pago import Pago, EstadoPago, MetodoPago
 from ..schemas.caso import CasoCreate, CasoUpdate, CasoResponse, CasoListResponse
 from ..services import openai_service, document_service, pago_service
+from ..services.vitawallet_service import vitawallet_service, VitaWalletError
 from .auth import get_current_user
 
 router = APIRouter(prefix="/casos", tags=["Casos"])
@@ -766,8 +769,9 @@ def simular_pago(
         }
 
     try:
-        # Crear pago y procesar beneficios
-        monto = 50000  # Precio en COP
+        # Determinar precio según tipo de documento
+        # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
+        monto = 39000 if caso.tipo_documento == TipoDocumento.TUTELA else 25000
         pago = pago_service.crear_pago_simulado(current_user.id, caso_id, monto, db)
 
         # Refrescar caso para obtener cambios
@@ -804,6 +808,199 @@ def simular_pago(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error procesando pago: {str(e)}"
         )
+
+
+@router.post("/{caso_id}/pago/iniciar")
+async def iniciar_pago_vita(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Inicia un pago con Vita Wallet
+
+    Flujo:
+    1. Valida que el caso existe y tiene documento generado
+    2. Determina el monto según tipo (TUTELA=39000, PETICION=25000)
+    3. Crea registro de Pago en estado PENDIENTE
+    4. Llama a Vita Wallet para crear payment_order
+    5. Guarda public_code en el pago
+    6. Retorna URL de checkout para redirigir al usuario
+
+    Returns:
+        {
+            "payment_url": "https://vitawallet.io/checkout?...",
+            "pago_id": 123,
+            "monto": 39000,
+            "caso_id": 456
+        }
+    """
+    # Verificar que el caso existe y pertenece al usuario
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    # Verificar que tiene documento generado
+    if not caso.documento_generado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No hay documento generado para pagar"
+        )
+
+    # Verificar que no esté ya pagado
+    if caso.documento_desbloqueado:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="El documento ya está desbloqueado"
+        )
+
+    # Verificar si ya hay un pago pendiente para este caso
+    pago_pendiente = db.query(Pago).filter(
+        Pago.caso_id == caso_id,
+        Pago.estado == EstadoPago.PENDIENTE,
+        Pago.metodo_pago == MetodoPago.VITA_WALLET
+    ).first()
+
+    if pago_pendiente and pago_pendiente.vita_public_code:
+        # Ya hay un pago pendiente, verificar si aún es válido
+        # Por ahora retornamos error, en el futuro podríamos re-usar la URL
+        logger.warning(f"Ya existe pago pendiente para caso {caso_id}: {pago_pendiente.id}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ya existe un pago pendiente para este caso. Completa el pago o espera a que expire."
+        )
+
+    # Determinar precio según tipo de documento
+    # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
+    if caso.tipo_documento == TipoDocumento.TUTELA:
+        monto = 39000
+    else:
+        monto = 25000
+
+    try:
+        # Crear registro de pago en estado PENDIENTE
+        pago = Pago(
+            user_id=current_user.id,
+            caso_id=caso_id,
+            monto=monto,
+            estado=EstadoPago.PENDIENTE,
+            metodo_pago=MetodoPago.VITA_WALLET,
+            created_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+
+        db.add(pago)
+        db.commit()
+        db.refresh(pago)
+
+        logger.info(f"Pago creado: id={pago.id}, caso={caso_id}, monto={monto}")
+
+        # Llamar a Vita Wallet para crear la orden de pago
+        vita_response = await vitawallet_service.crear_payment_order(
+            monto=monto,
+            caso_id=caso_id,
+            tipo_documento=caso.tipo_documento.value
+        )
+
+        # Guardar referencias de Vita en el pago
+        pago.vita_public_code = vita_response["public_code"]
+        pago.referencia_pago = vita_response["vita_order_id"]
+        db.commit()
+
+        logger.info(f"Payment order creada en Vita: public_code={vita_response['public_code']}")
+
+        return {
+            "success": True,
+            "payment_url": vita_response["payment_url"],
+            "pago_id": pago.id,
+            "monto": monto,
+            "caso_id": caso_id,
+            "public_code": vita_response["public_code"],
+            "expires_at": vita_response.get("expires_at"),
+            "mensaje": "Redirige al usuario a payment_url para completar el pago"
+        }
+
+    except VitaWalletError as e:
+        # Error de Vita Wallet
+        logger.error(f"Error Vita Wallet: {e.message}")
+
+        # Marcar el pago como fallido si existe
+        if 'pago' in locals():
+            pago.estado = EstadoPago.FALLIDO
+            pago.notas_admin = f"Error Vita: {e.message}"
+            db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Error al conectar con la pasarela de pago: {e.message}"
+        )
+
+    except Exception as e:
+        logger.error(f"Error inesperado iniciando pago: {str(e)}")
+
+        # Marcar el pago como fallido si existe
+        if 'pago' in locals():
+            pago.estado = EstadoPago.FALLIDO
+            pago.notas_admin = f"Error: {str(e)}"
+            db.commit()
+
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error iniciando pago: {str(e)}"
+        )
+
+
+@router.get("/{caso_id}/pago/estado")
+def obtener_estado_pago(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el estado del último pago para un caso
+
+    Útil para verificar si un pago pendiente fue completado
+    (por ejemplo, después de que el usuario vuelve de Vita)
+    """
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    # Obtener el último pago del caso
+    ultimo_pago = db.query(Pago).filter(
+        Pago.caso_id == caso_id
+    ).order_by(Pago.created_at.desc()).first()
+
+    if not ultimo_pago:
+        return {
+            "tiene_pago": False,
+            "documento_desbloqueado": caso.documento_desbloqueado
+        }
+
+    return {
+        "tiene_pago": True,
+        "pago_id": ultimo_pago.id,
+        "estado": ultimo_pago.estado.value,
+        "monto": float(ultimo_pago.monto),
+        "metodo_pago": ultimo_pago.metodo_pago.value,
+        "fecha_pago": ultimo_pago.fecha_pago.isoformat() if ultimo_pago.fecha_pago else None,
+        "documento_desbloqueado": caso.documento_desbloqueado,
+        "vita_public_code": ultimo_pago.vita_public_code
+    }
 
 
 @router.get("/{caso_id}/documento")
@@ -844,6 +1041,10 @@ def obtener_documento(
     documento_completo = caso.documento_generado
     longitud_total = len(documento_completo)
 
+    # Determinar precio según tipo de documento
+    # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
+    precio = 39000 if caso.tipo_documento == TipoDocumento.TUTELA else 25000
+
     # Determinar si está bloqueado
     esta_bloqueado = not caso.documento_desbloqueado
 
@@ -861,7 +1062,8 @@ def obtener_documento(
             "preview": True,
             "contenido": contenido_visible,
             "contenido_completo_length": longitud_total,
-            "precio": 50000,  # Precio ficticio en COP
+            "precio": precio,
+            "tipo_documento": caso.tipo_documento.value,
             "mensaje": "Desbloquea el documento completo para ver todo el contenido y descargarlo.",
             "descarga_habilitada": False,
             "fecha_pago": None
@@ -872,7 +1074,8 @@ def obtener_documento(
             "preview": False,
             "contenido": documento_completo,
             "contenido_completo_length": longitud_total,
-            "precio": 50000,
+            "precio": precio,
+            "tipo_documento": caso.tipo_documento.value,
             "mensaje": "",
             "descarga_habilitada": True,
             "fecha_pago": caso.fecha_pago.isoformat() if caso.fecha_pago else None

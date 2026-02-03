@@ -13,9 +13,13 @@ from . import sesion_service
 from . import pago_service
 from . import limpieza_service
 
+# Vita Wallet - Pasarela de pagos
+from . import vitawallet_service
+
 __all__ = [
     "nivel_service",
     "sesion_service",
     "pago_service",
     "limpieza_service",
+    "vitawallet_service",
 ]

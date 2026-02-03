@@ -25,6 +25,15 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str
 
+    # Vita Wallet
+    VITA_API_URL: str = "https://api.vitawallet.io"
+    VITA_API_KEY: Optional[str] = None  # X-Trans-Key para autenticación
+    VITA_API_SECRET: Optional[str] = None
+    VITA_BUSINESS_SECRET: Optional[str] = None  # Secret para validar webhooks (HMAC-SHA256)
+    VITA_X_LOGIN: Optional[str] = None  # Hash hexadecimal del business (para firmas)
+    VITA_WALLET_MASTER_UUID: Optional[str] = None  # UUID de la wallet maestra
+    VITA_ENVIRONMENT: str = "sandbox"  # sandbox | production
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
