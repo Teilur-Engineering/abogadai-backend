@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     # OpenAI
     OPENAI_API_KEY: str
 
+    # Precios de documentos (en COP)
+    PRECIO_TUTELA: int = 39000
+    PRECIO_DERECHO_PETICION: int = 25000
+
     # Vita Wallet
     VITA_API_URL: str = "https://api.vitawallet.io"
     VITA_API_KEY: Optional[str] = None  # X-Trans-Key para autenticación

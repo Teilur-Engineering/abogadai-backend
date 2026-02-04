@@ -769,9 +769,8 @@ def simular_pago(
         }
 
     try:
-        # Determinar precio según tipo de documento
-        # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
-        monto = 39000 if caso.tipo_documento == TipoDocumento.TUTELA else 25000
+        # Determinar precio según tipo de documento (configurable via env)
+        monto = settings.PRECIO_TUTELA if caso.tipo_documento == TipoDocumento.TUTELA else settings.PRECIO_DERECHO_PETICION
         pago = pago_service.crear_pago_simulado(current_user.id, caso_id, monto, db)
 
         # Refrescar caso para obtener cambios
@@ -877,12 +876,8 @@ async def iniciar_pago_vita(
             detail="Ya existe un pago pendiente para este caso. Completa el pago o espera a que expire."
         )
 
-    # Determinar precio según tipo de documento
-    # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
-    if caso.tipo_documento == TipoDocumento.TUTELA:
-        monto = 39000
-    else:
-        monto = 25000
+    # Determinar precio según tipo de documento (configurable via env)
+    monto = settings.PRECIO_TUTELA if caso.tipo_documento == TipoDocumento.TUTELA else settings.PRECIO_DERECHO_PETICION
 
     try:
         # Crear registro de pago en estado PENDIENTE
@@ -1142,9 +1137,8 @@ def obtener_documento(
     documento_completo = caso.documento_generado
     longitud_total = len(documento_completo)
 
-    # Determinar precio según tipo de documento
-    # TUTELA = $39,000 COP | DERECHO_PETICION = $25,000 COP
-    precio = 39000 if caso.tipo_documento == TipoDocumento.TUTELA else 25000
+    # Determinar precio según tipo de documento (configurable via env)
+    precio = settings.PRECIO_TUTELA if caso.tipo_documento == TipoDocumento.TUTELA else settings.PRECIO_DERECHO_PETICION
 
     # Determinar si está bloqueado
     esta_bloqueado = not caso.documento_desbloqueado
