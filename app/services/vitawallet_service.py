@@ -413,10 +413,10 @@ class VitaWalletService:
 
     async def consultar_estado_payment_order(self, public_code: str) -> dict:
         """
-        Consulta el estado actual de una payment order directamente en Vita.
+        Consulta el estado actual de una payment order buscando en los eventos de Vita.
 
-        Este método hace polling activo a la API de Vita para verificar
-        el estado del pago sin depender del webhook.
+        Busca en los últimos eventos si hay alguno relacionado con este public_code
+        que indique que el pago fue completado.
 
         Args:
             public_code: UUID público de la payment order
@@ -433,48 +433,65 @@ class VitaWalletService:
             return {"status": "unknown", "error": "No public_code provided"}
 
         try:
-            # Intentar GET a la payment_order por public_code
-            # El endpoint probable es /api/businesses/payment_orders/{public_code}
-            headers = self._get_headers({})
+            # Usar el endpoint de eventos que sí está documentado
+            eventos = await self.obtener_ultimos_eventos()
 
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                # Opción 1: Endpoint directo por public_code
-                response = await client.get(
-                    f"{self.base_url}/api/businesses/payment_orders/{public_code}",
-                    headers=headers
-                )
+            if eventos.get("error"):
+                return {"status": "unknown", "error": eventos["error"]}
 
-                if response.status_code == 200:
-                    data = response.json()
-                    attributes = data.get("data", {}).get("attributes", {})
+            # Buscar eventos relacionados con este public_code
+            for evento in eventos.get("events", []):
+                payload = evento.get("payload", {})
+                event_type = evento.get("event_type", "")
 
-                    return {
-                        "status": attributes.get("status", "unknown"),
-                        "amount": attributes.get("amount"),
-                        "paid_at": attributes.get("paid_at"),
-                        "expires_at": attributes.get("expires_at"),
-                        "error": None
-                    }
+                # Buscar el public_code en diferentes ubicaciones del payload
+                evento_public_code = None
 
-                elif response.status_code == 404:
-                    logger.warning(f"Payment order {public_code} no encontrada en Vita")
-                    return {"status": "not_found", "error": "Payment order no encontrada"}
+                # Puede estar en payload.public_code
+                if payload.get("public_code") == public_code:
+                    evento_public_code = public_code
+                # O en payload.order (para transaction.completed)
+                elif payload.get("order") == public_code:
+                    evento_public_code = public_code
+                # O en la descripción
+                elif public_code in str(payload.get("description", "")):
+                    evento_public_code = public_code
 
-                else:
-                    logger.warning(
-                        f"Error consultando payment order {public_code}: "
-                        f"{response.status_code} - {response.text}"
-                    )
-                    return {
-                        "status": "unknown",
-                        "error": f"HTTP {response.status_code}"
-                    }
+                if evento_public_code:
+                    status = payload.get("status", "")
+                    logger.info(f"Evento encontrado para {public_code}: type={event_type}, status={status}")
 
-        except httpx.TimeoutException:
-            logger.error(f"Timeout consultando payment order {public_code}")
-            return {"status": "unknown", "error": "Timeout"}
+                    # Determinar estado basado en el evento
+                    if event_type in ["payment_order.paid", "payment_order_attempt.paid"] or status == "paid":
+                        return {
+                            "status": "paid",
+                            "amount": payload.get("amount"),
+                            "paid_at": evento.get("created_at"),
+                            "event_type": event_type,
+                            "error": None
+                        }
+                    elif event_type == "transaction.completed" or status == "completed":
+                        return {
+                            "status": "completed",
+                            "amount": payload.get("amount"),
+                            "paid_at": evento.get("created_at"),
+                            "event_type": event_type,
+                            "error": None
+                        }
+                    elif status in ["expired", "cancelled", "failed", "denied", "time_out"]:
+                        return {
+                            "status": status,
+                            "amount": payload.get("amount"),
+                            "event_type": event_type,
+                            "error": None
+                        }
+
+            # Si no encontramos eventos relacionados, el pago sigue pendiente
+            logger.info(f"No se encontraron eventos para public_code {public_code}, asumiendo pendiente")
+            return {"status": "pending", "error": None}
+
         except Exception as e:
-            logger.error(f"Error consultando payment order: {str(e)}")
+            logger.error(f"Error consultando estado de payment order: {str(e)}")
             return {"status": "unknown", "error": str(e)}
 
     async def obtener_configuracion_webhook(self) -> dict:
