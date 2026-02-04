@@ -22,6 +22,12 @@ router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 logger = logging.getLogger(__name__)
 
 
+@router.get("/vita")
+async def vita_webhook_verificacion():
+    """Endpoint GET para verificación de URL por Vita Wallet"""
+    return {"status": "ok", "message": "Webhook endpoint activo"}
+
+
 @router.post("/vita")
 async def webhook_vita(
     request: Request,
