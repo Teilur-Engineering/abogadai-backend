@@ -723,29 +723,34 @@ def generar_documento(
         )
 
 
-@router.post("/{caso_id}/simular-pago")
-def simular_pago(
+@router.post("/{caso_id}/desbloquear-admin")
+def desbloquear_documento_admin(
     caso_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Simulador de pago (desarrollo)
+    Desbloquea un documento sin pago real (solo para administradores)
+
+    Permite a los admins:
+    - Probar el flujo completo sin pasar por Vita Wallet
+    - Desbloquear documentos de cualquier usuario (soporte)
 
     Sistema de Niveles y Beneficios:
-    1. Crea registro en tabla pagos
+    1. Crea registro en tabla pagos (monto $0, método SIMULADO)
     2. Desbloquea documento
-    3. Actualiza nivel del usuario
+    3. Actualiza nivel del usuario dueño del caso
     4. Desbloquea +2 sesiones extra inmediatas
-    5. Retorna beneficios obtenidos
-
-    En producción se reemplazará por integración con pasarela de pago real.
     """
+    # Verificar que el usuario es admin
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Solo administradores pueden usar este endpoint"
+        )
 
-    caso = db.query(Caso).filter(
-        Caso.id == caso_id,
-        Caso.user_id == current_user.id
-    ).first()
+    # Buscar caso (admin puede ver cualquier caso)
+    caso = db.query(Caso).filter(Caso.id == caso_id).first()
 
     if not caso:
         raise HTTPException(
@@ -760,7 +765,6 @@ def simular_pago(
         )
 
     if caso.documento_desbloqueado:
-        # Retornar info del pago existente
         return {
             "success": True,
             "message": "Documento ya estaba desbloqueado",
@@ -769,20 +773,18 @@ def simular_pago(
         }
 
     try:
-        # Determinar precio según tipo de documento (configurable via env)
-        monto = settings.PRECIO_TUTELA if caso.tipo_documento == TipoDocumento.TUTELA else settings.PRECIO_DERECHO_PETICION
-        pago = pago_service.crear_pago_simulado(current_user.id, caso_id, monto, db)
+        # Crear pago simulado con monto $0 para el dueño del caso
+        pago = pago_service.crear_pago_simulado(caso.user_id, caso_id, 0, db)
 
-        # Refrescar caso para obtener cambios
         db.refresh(caso)
 
-        # Obtener beneficios procesados
+        # Obtener beneficios del dueño del caso
         from ..services import nivel_service
-        nivel_info = nivel_service.obtener_limites_usuario(current_user.id, db)
+        nivel_info = nivel_service.obtener_limites_usuario(caso.user_id, db)
 
         return {
             "success": True,
-            "message": "Pago procesado exitosamente",
+            "message": "Documento desbloqueado por administrador",
             "caso": caso,
             "pago": {
                 "id": pago.id,
@@ -798,14 +800,16 @@ def simular_pago(
                     "nombre_nivel": nivel_info["nombre_nivel"],
                     "sesiones_dia": nivel_info["sesiones_dia"]
                 }
-            }
+            },
+            "admin_action": True,
+            "desbloqueado_por": current_user.email
         }
 
     except Exception as e:
-        logger.error(f"❌ Error procesando pago: {str(e)}")
+        logger.error(f"Error desbloqueando documento (admin): {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error procesando pago: {str(e)}"
+            detail=f"Error desbloqueando documento: {str(e)}"
         )
 
 
