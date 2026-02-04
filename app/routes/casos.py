@@ -1055,6 +1055,55 @@ async def obtener_estado_pago(
     }
 
 
+@router.post("/{caso_id}/pago/cancelar")
+async def cancelar_pago_pendiente(
+    caso_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Cancela un pago pendiente para permitir reintentar.
+
+    Se usa cuando Vita redirige con ?pago=error o ?pago=cancelado,
+    indicando que el intento de pago falló y el usuario quiere reintentar.
+    """
+    caso = db.query(Caso).filter(
+        Caso.id == caso_id,
+        Caso.user_id == current_user.id
+    ).first()
+
+    if not caso:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Caso no encontrado"
+        )
+
+    # Buscar pago pendiente
+    pago_pendiente = db.query(Pago).filter(
+        Pago.caso_id == caso_id,
+        Pago.estado == EstadoPago.PENDIENTE
+    ).first()
+
+    if not pago_pendiente:
+        return {
+            "success": True,
+            "message": "No hay pago pendiente para cancelar"
+        }
+
+    # Marcar como fallido
+    pago_pendiente.estado = EstadoPago.FALLIDO
+    pago_pendiente.notas_admin = "Cancelado por el usuario (error/cancelado en pasarela)"
+    db.commit()
+
+    logger.info(f"Pago {pago_pendiente.id} cancelado por usuario para caso {caso_id}")
+
+    return {
+        "success": True,
+        "message": "Pago pendiente cancelado. Puedes intentar de nuevo.",
+        "pago_id": pago_pendiente.id
+    }
+
+
 @router.get("/{caso_id}/documento")
 def obtener_documento(
     caso_id: int,
