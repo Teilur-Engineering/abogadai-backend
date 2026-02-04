@@ -498,10 +498,12 @@ def procesar_transcripcion(
         # Actualizar tipo_documento usando el RECOMENDADO
         if datos_extraidos.get('tipo_documento_recomendado'):
             tipo_doc = datos_extraidos['tipo_documento_recomendado']
+            # Normalizar a mayúsculas para comparación (OpenAI retorna en mayúsculas)
+            tipo_doc_upper = tipo_doc.upper() if isinstance(tipo_doc, str) else 'TUTELA'
 
-            if tipo_doc == 'tutela':
+            if tipo_doc_upper == 'TUTELA':
                 caso.tipo_documento = TipoDocumento.TUTELA
-            elif tipo_doc == 'derecho_peticion':
+            elif tipo_doc_upper == 'DERECHO_PETICION':
                 caso.tipo_documento = TipoDocumento.DERECHO_PETICION
 
             campos_actualizados.append('tipo_documento')
