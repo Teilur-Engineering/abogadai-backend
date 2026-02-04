@@ -411,5 +411,222 @@ class VitaWalletService:
         return False
 
 
+    async def consultar_estado_payment_order(self, public_code: str) -> dict:
+        """
+        Consulta el estado actual de una payment order directamente en Vita.
+
+        Este método hace polling activo a la API de Vita para verificar
+        el estado del pago sin depender del webhook.
+
+        Args:
+            public_code: UUID público de la payment order
+
+        Returns:
+            {
+                "status": "pending|paid|expired|cancelled",
+                "amount": 39000,
+                "paid_at": "2024-03-12T...",  # si fue pagado
+                "error": None  # o mensaje de error
+            }
+        """
+        if not public_code:
+            return {"status": "unknown", "error": "No public_code provided"}
+
+        try:
+            # Intentar GET a la payment_order por public_code
+            # El endpoint probable es /api/businesses/payment_orders/{public_code}
+            headers = self._get_headers({})
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                # Opción 1: Endpoint directo por public_code
+                response = await client.get(
+                    f"{self.base_url}/api/businesses/payment_orders/{public_code}",
+                    headers=headers
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    attributes = data.get("data", {}).get("attributes", {})
+
+                    return {
+                        "status": attributes.get("status", "unknown"),
+                        "amount": attributes.get("amount"),
+                        "paid_at": attributes.get("paid_at"),
+                        "expires_at": attributes.get("expires_at"),
+                        "error": None
+                    }
+
+                elif response.status_code == 404:
+                    logger.warning(f"Payment order {public_code} no encontrada en Vita")
+                    return {"status": "not_found", "error": "Payment order no encontrada"}
+
+                else:
+                    logger.warning(
+                        f"Error consultando payment order {public_code}: "
+                        f"{response.status_code} - {response.text}"
+                    )
+                    return {
+                        "status": "unknown",
+                        "error": f"HTTP {response.status_code}"
+                    }
+
+        except httpx.TimeoutException:
+            logger.error(f"Timeout consultando payment order {public_code}")
+            return {"status": "unknown", "error": "Timeout"}
+        except Exception as e:
+            logger.error(f"Error consultando payment order: {str(e)}")
+            return {"status": "unknown", "error": str(e)}
+
+    async def obtener_configuracion_webhook(self) -> dict:
+        """
+        Obtiene la configuración actual del webhook desde Vita.
+
+        Útil para verificar si las categorías correctas están configuradas.
+
+        Returns:
+            {
+                "webhook_url": "https://...",
+                "configured_categories": ["payment", "deposit"],
+                "available_categories": ["payment", "deposit", ...],
+                "error": None
+            }
+        """
+        try:
+            headers = self._get_headers({})
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/api/businesses/webhooks",
+                    headers=headers
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "webhook_url": data.get("webhook_url"),
+                        "configured_categories": data.get("configured_categories", []),
+                        "available_categories": data.get("available_categories", []),
+                        "error": None
+                    }
+                else:
+                    return {
+                        "webhook_url": None,
+                        "configured_categories": [],
+                        "available_categories": [],
+                        "error": f"HTTP {response.status_code}: {response.text}"
+                    }
+
+        except Exception as e:
+            logger.error(f"Error obteniendo configuración webhook: {str(e)}")
+            return {
+                "webhook_url": None,
+                "configured_categories": [],
+                "available_categories": [],
+                "error": str(e)
+            }
+
+    async def actualizar_configuracion_webhook(
+        self,
+        webhook_url: str,
+        categories: list
+    ) -> dict:
+        """
+        Actualiza la configuración del webhook en Vita.
+
+        Args:
+            webhook_url: URL HTTPS donde Vita enviará los webhooks
+            categories: Lista de categorías (ej: ["payment", "deposit"])
+
+        Returns:
+            {
+                "success": True/False,
+                "message": "...",
+                "error": None
+            }
+        """
+        try:
+            payload = {
+                "webhook_url": webhook_url,
+                "categories": categories
+            }
+
+            headers = self._get_headers(payload)
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.put(
+                    f"{self.base_url}/api/businesses/webhooks",
+                    headers=headers,
+                    json=payload
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "success": True,
+                        "message": data.get("message", "Configuración actualizada"),
+                        "webhook_url": data.get("webhook_url"),
+                        "categories": data.get("categories"),
+                        "error": None
+                    }
+                else:
+                    return {
+                        "success": False,
+                        "message": "Error actualizando configuración",
+                        "error": f"HTTP {response.status_code}: {response.text}"
+                    }
+
+        except Exception as e:
+            logger.error(f"Error actualizando webhook: {str(e)}")
+            return {
+                "success": False,
+                "message": "Error de conexión",
+                "error": str(e)
+            }
+
+    async def obtener_ultimos_eventos(self) -> dict:
+        """
+        Obtiene los últimos 10 eventos del negocio desde Vita.
+
+        Útil para debugging y verificar si los webhooks están llegando.
+
+        Returns:
+            {
+                "events": [...],
+                "total": 10,
+                "error": None
+            }
+        """
+        try:
+            headers = self._get_headers({})
+
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.get(
+                    f"{self.base_url}/api/businesses/events",
+                    headers=headers
+                )
+
+                if response.status_code == 200:
+                    data = response.json()
+                    return {
+                        "events": data.get("events", []),
+                        "total": data.get("total", 0),
+                        "error": None
+                    }
+                else:
+                    return {
+                        "events": [],
+                        "total": 0,
+                        "error": f"HTTP {response.status_code}: {response.text}"
+                    }
+
+        except Exception as e:
+            logger.error(f"Error obteniendo eventos: {str(e)}")
+            return {
+                "events": [],
+                "total": 0,
+                "error": str(e)
+            }
+
+
 # Instancia global del servicio
 vitawallet_service = VitaWalletService()

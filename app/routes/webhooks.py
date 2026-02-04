@@ -279,3 +279,80 @@ async def vita_webhook_health():
         "service": "vita_webhook",
         "timestamp": datetime.utcnow().isoformat()
     }
+
+
+@router.get("/vita/config")
+async def obtener_configuracion_vita():
+    """
+    Obtiene la configuración actual del webhook desde Vita API.
+
+    Útil para verificar:
+    - Si el webhook_url está correctamente configurado
+    - Si las categorías incluyen "payment"
+
+    NOTA: Si 'payment' no está en configured_categories,
+    los webhooks de pago NO llegarán.
+    """
+    config = await vitawallet_service.obtener_configuracion_webhook()
+
+    # Verificar si payment está configurado
+    tiene_payment = "payment" in config.get("configured_categories", [])
+
+    return {
+        **config,
+        "tiene_categoria_payment": tiene_payment,
+        "recomendacion": None if tiene_payment else
+            "IMPORTANTE: La categoría 'payment' no está configurada. "
+            "Los webhooks de pago no llegarán hasta que se agregue."
+    }
+
+
+@router.post("/vita/config")
+async def actualizar_configuracion_vita(
+    webhook_url: str = None,
+    categories: list = None
+):
+    """
+    Actualiza la configuración del webhook en Vita.
+
+    Args:
+        webhook_url: URL del webhook (requerido la primera vez, ej: https://abogadai-backend.onrender.com/webhooks/vita)
+        categories: Lista de categorías (opcional, usa ["payment"] si no se especifica)
+
+    Ejemplo de uso:
+        POST /webhooks/vita/config?webhook_url=https://abogadai-backend.onrender.com/webhooks/vita&categories=payment
+    """
+    # Valores por defecto
+    if not webhook_url:
+        # Intentar obtener la config actual y usar esa URL
+        config_actual = await vitawallet_service.obtener_configuracion_webhook()
+        webhook_url = config_actual.get("webhook_url")
+
+        if not webhook_url:
+            return {
+                "success": False,
+                "error": "webhook_url es requerido. Ej: https://abogadai-backend.onrender.com/webhooks/vita"
+            }
+
+    if not categories:
+        categories = ["payment"]
+
+    result = await vitawallet_service.actualizar_configuracion_webhook(
+        webhook_url=webhook_url,
+        categories=categories
+    )
+
+    return result
+
+
+@router.get("/vita/eventos")
+async def obtener_ultimos_eventos_vita():
+    """
+    Obtiene los últimos 10 eventos del negocio desde Vita.
+
+    Útil para:
+    - Debugging de webhooks
+    - Verificar si los eventos de pago están siendo generados
+    - Ver el estado de entrega de webhooks
+    """
+    return await vitawallet_service.obtener_ultimos_eventos()

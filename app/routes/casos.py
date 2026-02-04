@@ -958,13 +958,17 @@ async def iniciar_pago_vita(
 
 
 @router.get("/{caso_id}/pago/estado")
-def obtener_estado_pago(
+async def obtener_estado_pago(
     caso_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Obtiene el estado del último pago para un caso
+    Obtiene el estado del último pago para un caso.
+
+    POLLING ACTIVO: Si el pago está pendiente y tiene public_code,
+    consulta directamente a Vita API para verificar el estado actual.
+    Si Vita confirma que está pagado, actualiza la BD y procesa el pago.
 
     Útil para verificar si un pago pendiente fue completado
     (por ejemplo, después de que el usuario vuelve de Vita)
@@ -990,6 +994,54 @@ def obtener_estado_pago(
             "tiene_pago": False,
             "documento_desbloqueado": caso.documento_desbloqueado
         }
+
+    # POLLING ACTIVO: Si el pago está pendiente, consultar Vita directamente
+    if (ultimo_pago.estado == EstadoPago.PENDIENTE and
+        ultimo_pago.vita_public_code and
+        ultimo_pago.metodo_pago == MetodoPago.VITA_WALLET):
+
+        logger.info(f"Polling activo a Vita para pago {ultimo_pago.id}, public_code={ultimo_pago.vita_public_code}")
+
+        try:
+            # Consultar estado actual en Vita
+            vita_status = await vitawallet_service.consultar_estado_payment_order(
+                ultimo_pago.vita_public_code
+            )
+
+            logger.info(f"Respuesta Vita polling: {vita_status}")
+
+            # Si Vita confirma que está pagado, procesar
+            if vita_status.get("status") in ["paid", "completed"]:
+                logger.info(f"Vita confirma pago exitoso para {ultimo_pago.vita_public_code}")
+
+                # Actualizar estado del pago
+                ultimo_pago.estado = EstadoPago.EXITOSO
+                ultimo_pago.fecha_pago = datetime.utcnow()
+                db.commit()
+
+                # Procesar beneficios (desbloquear documento, etc.)
+                try:
+                    from ..services.pago_service import procesar_pago_exitoso
+                    beneficios = procesar_pago_exitoso(ultimo_pago.id, db)
+                    logger.info(f"Beneficios procesados via polling: {beneficios}")
+                except Exception as e:
+                    logger.error(f"Error procesando beneficios via polling: {str(e)}")
+
+                # Refrescar caso para obtener estado actualizado
+                db.refresh(caso)
+
+            elif vita_status.get("status") in ["expired", "cancelled", "failed"]:
+                logger.info(f"Vita reporta pago fallido/expirado: {vita_status.get('status')}")
+                ultimo_pago.estado = EstadoPago.FALLIDO
+                ultimo_pago.notas_admin = f"Estado Vita: {vita_status.get('status')}"
+                db.commit()
+
+        except Exception as e:
+            # Si falla el polling, continuamos con el estado de la BD
+            logger.warning(f"Error en polling activo a Vita: {str(e)}")
+
+    # Refrescar el pago por si fue modificado
+    db.refresh(ultimo_pago)
 
     return {
         "tiene_pago": True,
