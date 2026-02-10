@@ -119,19 +119,20 @@ class VitaWalletService:
         Construye las URLs de redirección para después del pago
 
         Vita redirige al usuario según el resultado:
-        - success: Pago completado (redirige directo al caso)
+        - success: Pago completado (redirige a thank you page en Webflow)
         - cancel: Usuario canceló
         - error: Error en el proceso
         - pending: Pago pendiente de confirmación
 
-        El frontend detecta automáticamente que es modo vista si hay casoId
+        El thank you page de Webflow tiene el evento de conversión de Google Ads
+        y un botón que redirige al usuario a la app para ver su documento.
         """
         caso_url = f"{settings.FRONTEND_URL}/app/tutela/{caso_id}"
         casos_url = f"{settings.FRONTEND_URL}/app/casos"
 
         return {
-            # Exitoso y pendiente van directo al caso para verificar/mostrar documento
-            "success_redirect_url": f"{caso_url}?pago=exitoso",
+            # Exitoso va al thank you page de Webflow para tracking de conversión
+            "success_redirect_url": f"https://www.abogadai.com/gracias?caso_id={caso_id}",
             "pending_redirect_url": f"{caso_url}?pago=pendiente",
             # Cancelado y error van a la lista de casos
             "cancel_redirect_url": f"{casos_url}?pago=cancelado&caso_id={caso_id}",
