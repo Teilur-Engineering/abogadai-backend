@@ -3,15 +3,22 @@ Endpoints de Administración - Reembolsos y Métricas
 Solo accesible para usuarios administradores
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, func
 
 from ..core.database import get_db
 from ..models.user import User
 from ..models import Caso, Pago, EstadoCaso
+from ..models.audit_log import AuditLog
 from .auth import get_current_user
 from ..services import pago_service, nivel_service
+from ..services.audit_service import (
+    registrar_auditoria,
+    ACCION_APROBAR_REEMBOLSO,
+    ACCION_RECHAZAR_REEMBOLSO,
+    ACCION_PROCESAR_REEMBOLSO,
+)
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -91,6 +98,7 @@ async def procesar_solicitud_reembolso(
     caso_id: int,
     aprobar: bool,
     comentario: str,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -109,6 +117,17 @@ async def procesar_solicitud_reembolso(
         if aprobar:
             # TODO: Aquí se integraría con la pasarela de pago para reembolsar dinero real
             pass
+
+        registrar_auditoria(
+            db=db,
+            admin_id=current_user.id,
+            admin_email=current_user.email,
+            accion=ACCION_PROCESAR_REEMBOLSO,
+            entidad="caso",
+            entidad_id=caso_id,
+            detalle={"decision": "aprobado" if aprobar else "rechazado", "comentario": comentario},
+            ip=request.client.host if request.client else None,
+        )
 
         return {
             "success": True,
@@ -408,6 +427,7 @@ async def listar_reembolsos_con_filtro(
 @router.post("/reembolsos/{caso_id}/aprobar")
 async def aprobar_reembolso(
     caso_id: int,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -440,6 +460,17 @@ async def aprobar_reembolso(
             db=db
         )
 
+        registrar_auditoria(
+            db=db,
+            admin_id=current_user.id,
+            admin_email=current_user.email,
+            accion=ACCION_APROBAR_REEMBOLSO,
+            entidad="caso",
+            entidad_id=caso_id,
+            detalle={"user_email": caso.user.email if caso.user else None},
+            ip=request.client.host if request.client else None,
+        )
+
         return {
             "success": True,
             "message": "Reembolso aprobado exitosamente",
@@ -460,6 +491,7 @@ async def aprobar_reembolso(
 async def rechazar_reembolso(
     caso_id: int,
     body: dict,
+    request: Request,
     current_user: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -503,6 +535,17 @@ async def rechazar_reembolso(
             db=db
         )
 
+        registrar_auditoria(
+            db=db,
+            admin_id=current_user.id,
+            admin_email=current_user.email,
+            accion=ACCION_RECHAZAR_REEMBOLSO,
+            entidad="caso",
+            entidad_id=caso_id,
+            detalle={"razon": razon.strip(), "user_email": caso.user.email if caso.user else None},
+            ip=request.client.host if request.client else None,
+        )
+
         return {
             "success": True,
             "message": "Reembolso rechazado",
@@ -518,3 +561,45 @@ async def rechazar_reembolso(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error rechazando reembolso: {str(e)}"
         )
+
+
+@router.get("/auditoria")
+async def listar_auditoria(
+    limite: int = 100,
+    accion: str = None,
+    entidad_id: int = None,
+    current_user: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    📋 Log de auditoría de acciones administrativas
+
+    Retorna los últimos registros de auditoría, opcionalmente filtrados
+    por tipo de acción o entidad.
+    """
+    query = db.query(AuditLog)
+
+    if accion:
+        query = query.filter(AuditLog.accion == accion)
+    if entidad_id:
+        query = query.filter(AuditLog.entidad_id == entidad_id)
+
+    logs = (
+        query.order_by(AuditLog.timestamp.desc())
+        .limit(min(limite, 500))
+        .all()
+    )
+
+    return [
+        {
+            "id": log.id,
+            "admin_email": log.admin_email,
+            "accion": log.accion,
+            "entidad": log.entidad,
+            "entidad_id": log.entidad_id,
+            "detalle": log.detalle,
+            "ip": log.ip,
+            "timestamp": log.timestamp.isoformat(),
+        }
+        for log in logs
+    ]

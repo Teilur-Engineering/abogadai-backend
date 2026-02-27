@@ -1,26 +1,58 @@
+import asyncio
+import logging
+import os
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.routes import auth, livekit, casos, referencias, sesiones, mensajes, perfil, migrations, usuarios, admin, webhooks
-import logging
-import os
+# Importar modelos que no están en ninguna ruta para que create_all los registre
+from app.models.audit_log import AuditLog  # noqa: F401
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Crear tablas en la base de datos
+# Crear tablas en la base de datos (incluye audit_logs)
 Base.metadata.create_all(bind=engine)
+
+
+async def _tarea_cerrar_rooms_inactivos():
+    """Tarea periódica: cierra rooms LiveKit que llevan >30 min activos."""
+    # Espera inicial para que el servidor termine de arrancar
+    await asyncio.sleep(60)
+    while True:
+        try:
+            from app.services.livekit_service import cerrar_rooms_inactivos
+            cerrados = await cerrar_rooms_inactivos()
+            if cerrados:
+                logger.info(f"[LiveKit cleanup] {cerrados} rooms inactivos cerrados")
+        except Exception as e:
+            logger.error(f"[LiveKit cleanup] Error: {e}")
+        await asyncio.sleep(600)  # cada 10 minutos
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: lanzar tarea background de limpieza de rooms
+    asyncio.create_task(_tarea_cerrar_rooms_inactivos())
+    logger.info("[Lifespan] Tarea de limpieza de rooms LiveKit iniciada (cada 10 min)")
+    yield
+    # Shutdown: no hay limpieza especial necesaria
+
 
 app = FastAPI(
     title="Abogadai API",
     description="API para la plataforma Abogadai - Generación de tutelas y derechos de petición con IA",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan,
 )
 
 # Configurar CORS
