@@ -24,6 +24,10 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Recuperación de contraseña
+    reset_password_token = Column(String(255), nullable=True, index=True)
+    reset_token_expires = Column(DateTime, nullable=True)
+
     # Sistema de niveles y límites
     nivel_usuario = Column(Integer, default=0, nullable=False)  # 0=Free, 1=Bronce, 2=Plata, 3=Oro
     pagos_ultimo_mes = Column(Integer, default=0, nullable=False)  # Contador de pagos en últimos 30 días

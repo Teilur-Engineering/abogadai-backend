@@ -75,33 +75,34 @@ async def webhook_vita(
 
         if not signature:
             logger.warning("Webhook Vita: No se encontró firma en Authorization header")
-            # En desarrollo/sandbox podemos continuar sin validar
-            # En producción esto debería ser un error
-            if vitawallet_service.environment == "production":
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Firma no encontrada en header Authorization"
-                )
-            else:
-                logger.warning("Modo sandbox: Continuando sin validar firma")
-
-        # Validar firma (si tenemos credenciales configuradas)
-        if signature and x_date:
-            is_valid = vitawallet_service.verificar_firma_webhook(
-                x_date=x_date,
-                body=body,
-                signature_recibida=signature
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Firma no encontrada en header Authorization"
             )
 
-            if not is_valid:
-                logger.error("Webhook Vita: Firma inválida")
-                if vitawallet_service.environment == "production":
-                    raise HTTPException(
-                        status_code=status.HTTP_401_UNAUTHORIZED,
-                        detail="Firma de webhook inválida"
-                    )
-                else:
-                    logger.warning("Modo sandbox: Continuando con firma inválida")
+        if not x_date:
+            logger.warning("Webhook Vita: No se encontró header X-Date")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Header X-Date requerido"
+            )
+
+        # Validar firma HMAC-SHA256 (siempre, en todos los entornos)
+        is_valid = vitawallet_service.verificar_firma_webhook(
+            x_date=x_date,
+            body=body,
+            signature_recibida=signature
+        )
+
+        if not is_valid:
+            logger.error(
+                f"Webhook Vita: Firma inválida "
+                f"(entorno={vitawallet_service.environment})"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Firma de webhook inválida"
+            )
 
         # Parsear evento
         evento = vitawallet_service.parsear_evento_webhook(body)

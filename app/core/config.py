@@ -38,6 +38,14 @@ class Settings(BaseSettings):
     VITA_WALLET_MASTER_UUID: Optional[str] = None  # UUID de la wallet maestra
     VITA_ENVIRONMENT: str = "sandbox"  # sandbox | production
 
+    # Email / SMTP (para recuperación de contraseña)
+    SMTP_HOST: Optional[str] = None
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: str = "noreply@abogadai.com"
+    SMTP_TLS: bool = True
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

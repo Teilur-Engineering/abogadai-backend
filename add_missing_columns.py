@@ -35,6 +35,8 @@ try:
             ("pagos_ultimo_mes", "INTEGER DEFAULT 0 NOT NULL"),
             ("ultimo_recalculo_nivel", "TIMESTAMP NULL"),
             ("sesiones_extra_hoy", "INTEGER DEFAULT 0 NOT NULL"),
+            ("reset_password_token", "VARCHAR(255) NULL"),
+            ("reset_token_expires", "TIMESTAMP NULL"),
         ]
 
         for col_name, col_def in columnas_users:

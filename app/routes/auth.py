@@ -1,7 +1,9 @@
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from datetime import timedelta
 
 from app.core.database import get_db
 from app.core.security import (
@@ -12,7 +14,11 @@ from app.core.security import (
 )
 from app.core.config import settings
 from app.models.user import User
-from app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from app.schemas.user import (
+    UserCreate, UserLogin, UserResponse, Token,
+    ForgotPasswordRequest, ResetPasswordRequest
+)
+from app.services.email_service import enviar_email_reset_contrasena
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 security = HTTPBearer()
@@ -104,3 +110,76 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(
+    request_data: ForgotPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Solicita recuperación de contraseña.
+
+    Genera un token de reset (válido 1 hora) y envía el email.
+    Siempre retorna 200 para no revelar si el email existe o no.
+    """
+    user = db.query(User).filter(User.email == request_data.email).first()
+
+    if user and user.is_active:
+        token = secrets.token_urlsafe(32)
+        user.reset_password_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(hours=1)
+        db.commit()
+
+        try:
+            await enviar_email_reset_contrasena(
+                email_destino=user.email,
+                nombre=user.nombre,
+                token=token
+            )
+        except Exception:
+            # No exponer el error al cliente; el log ya registró el detalle
+            pass
+
+    return {
+        "message": "Si el email está registrado, recibirás un enlace para restablecer tu contraseña"
+    }
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+def reset_password(
+    request_data: ResetPasswordRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Restablece la contraseña usando el token recibido por email.
+
+    El token es de un solo uso y expira en 1 hora.
+    """
+    user = db.query(User).filter(
+        User.reset_password_token == request_data.token
+    ).first()
+
+    token_invalido = (
+        user is None
+        or user.reset_token_expires is None
+        or datetime.utcnow() > user.reset_token_expires
+    )
+
+    if token_invalido:
+        # Limpiar token si el usuario existe pero expiró
+        if user:
+            user.reset_password_token = None
+            user.reset_token_expires = None
+            db.commit()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token inválido o expirado"
+        )
+
+    user.hashed_password = get_password_hash(request_data.new_password)
+    user.reset_password_token = None
+    user.reset_token_expires = None
+    db.commit()
+
+    return {"message": "Contraseña restablecida exitosamente"}
