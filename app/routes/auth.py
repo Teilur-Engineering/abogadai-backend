@@ -139,7 +139,9 @@ def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db
         path="/"
     )
 
-    return {"message": "Login exitoso"}
+    # También devolver el token en el cuerpo para clientes cross-site
+    # donde las cookies SameSite=lax no se envían en peticiones AJAX
+    return {"message": "Login exitoso", "access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me", response_model=UserResponse)
