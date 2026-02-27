@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 
-from ..core.database import get_db
+from ..core.database import get_db, SessionLocal
 from ..core.config import settings
 from ..models.user import User
 from ..models.caso import Caso, EstadoCaso, TipoDocumento
@@ -19,6 +19,63 @@ from .auth import get_current_user
 
 router = APIRouter(prefix="/casos", tags=["Casos"])
 logger = logging.getLogger(__name__)
+
+
+def _generar_documento_bg(caso_id: int, tipo_doc: str):
+    """
+    Genera el documento legal en background.
+    Usa su propia sesión de BD porque FastAPI cierra la sesión de la request al retornar el 202.
+    """
+    db = SessionLocal()
+    caso = None
+    try:
+        caso = db.query(Caso).filter(Caso.id == caso_id).first()
+        if not caso:
+            logger.error(f"_generar_documento_bg: caso {caso_id} no encontrado")
+            return
+
+        datos_caso = {
+            'nombre_solicitante': caso.nombre_solicitante,
+            'identificacion_solicitante': caso.identificacion_solicitante,
+            'direccion_solicitante': caso.direccion_solicitante,
+            'telefono_solicitante': caso.telefono_solicitante,
+            'email_solicitante': caso.email_solicitante,
+            'actua_en_representacion': caso.actua_en_representacion,
+            'nombre_representado': caso.nombre_representado,
+            'identificacion_representado': caso.identificacion_representado,
+            'relacion_representado': caso.relacion_representado,
+            'tipo_representado': caso.tipo_representado,
+            'entidad_accionada': caso.entidad_accionada,
+            'direccion_entidad': caso.direccion_entidad,
+            'hechos': caso.hechos,
+            'ciudad_de_los_hechos': caso.ciudad_de_los_hechos,
+            'derechos_vulnerados': caso.derechos_vulnerados,
+            'pretensiones': caso.pretensiones,
+            'fundamentos_derecho': caso.fundamentos_derecho,
+            'pruebas': caso.pruebas,
+        }
+
+        if tipo_doc == 'TUTELA':
+            doc = openai_service.generar_tutela(datos_caso)
+        else:
+            doc = openai_service.generar_derecho_peticion(datos_caso)
+
+        caso.documento_generado = doc
+        caso.estado = EstadoCaso.GENERADO
+        caso.fecha_vencimiento = datetime.utcnow() + timedelta(days=14)
+        db.commit()
+        logger.info(f"✅ Documento generado exitosamente para caso {caso_id}")
+
+    except Exception as e:
+        logger.error(f"❌ Error generando documento caso {caso_id}: {e}")
+        try:
+            if caso:
+                caso.estado = EstadoCaso.ERROR_GENERACION
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 
 @router.post("/", response_model=CasoResponse, status_code=status.HTTP_201_CREATED)
@@ -607,18 +664,21 @@ def procesar_transcripcion(
         )
 
 
-@router.post("/{caso_id}/generar", response_model=CasoResponse)
-def generar_documento(
+@router.post("/{caso_id}/generar", response_model=CasoResponse, status_code=202)
+async def generar_documento(
     caso_id: int,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Genera el documento legal usando GPT-4 basado en los datos del caso.
-    Incluye análisis automático de calidad y jurisprudencia.
+    Inicia la generación del documento legal en background y retorna 202.
 
-    VALIDACIÓN ESTRICTA: Este endpoint valida que todos los campos críticos
-    estén completos y con formato válido antes de generar el documento.
+    El cliente debe hacer polling a GET /casos/{id} cada 2s hasta que
+    estado sea GENERADO o ERROR_GENERACION.
+
+    VALIDACIÓN ESTRICTA: Valida todos los campos críticos antes de encolar
+    la tarea background.
     """
     caso = db.query(Caso).filter(
         Caso.id == caso_id,
@@ -652,22 +712,18 @@ def generar_documento(
 
     # Validación de subsidiariedad
     if caso.tipo_documento and caso.tipo_documento.value == "TUTELA":
-        # Verificar si es_procedente_tutela fue evaluado y es False
         if caso.es_procedente_tutela is False:
-            # Cambio automático a DERECHO DE PETICIÓN
             caso.tipo_documento = TipoDocumento.DERECHO_PETICION
             db.commit()
 
-    # 🔍 VALIDACIÓN ESTRICTA: Validar campos críticos según tipo de documento
+    # Validar campos críticos según tipo de documento
     from ..core.validation_helper import validar_caso_completo
 
-    # Refrescar el caso para obtener el tipo actualizado (en caso de cambio automático)
     db.refresh(caso)
     tipo_doc = caso.tipo_documento.value if caso.tipo_documento else "TUTELA"
     resultado_validacion = validar_caso_completo(caso, tipo_doc)
 
     if not resultado_validacion["valido"]:
-        # Retornar errores detallados para que el frontend los muestre
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail={
@@ -677,52 +733,14 @@ def generar_documento(
             }
         )
 
-    try:
-        # Preparar datos para GPT
-        datos_caso = {
-            'nombre_solicitante': caso.nombre_solicitante,
-            'identificacion_solicitante': caso.identificacion_solicitante,
-            'direccion_solicitante': caso.direccion_solicitante,
-            'telefono_solicitante': caso.telefono_solicitante,
-            'email_solicitante': caso.email_solicitante,
-            'actua_en_representacion': caso.actua_en_representacion,
-            'nombre_representado': caso.nombre_representado,
-            'identificacion_representado': caso.identificacion_representado,
-            'relacion_representado': caso.relacion_representado,
-            'tipo_representado': caso.tipo_representado,
-            'entidad_accionada': caso.entidad_accionada,
-            'direccion_entidad': caso.direccion_entidad,
-            'hechos': caso.hechos,
-            'ciudad_de_los_hechos': caso.ciudad_de_los_hechos,
-            'derechos_vulnerados': caso.derechos_vulnerados,
-            'pretensiones': caso.pretensiones,
-            'fundamentos_derecho': caso.fundamentos_derecho,
-            'pruebas': caso.pruebas,
-        }
+    # Marcar como GENERANDO y encolar la tarea background
+    caso.estado = EstadoCaso.GENERANDO
+    db.commit()
+    db.refresh(caso)
 
-        # Generar documento según el tipo (usar tipo_doc ya validado)
-        if tipo_doc == 'TUTELA':
-            documento_generado = openai_service.generar_tutela(datos_caso)
-        else:
-            documento_generado = openai_service.generar_derecho_peticion(datos_caso)
+    background_tasks.add_task(_generar_documento_bg, caso_id, tipo_doc)
 
-        # Actualizar caso con documento generado
-        caso.documento_generado = documento_generado
-        caso.estado = EstadoCaso.GENERADO
-
-        # Calcular fecha de vencimiento (14 días desde ahora)
-        caso.fecha_vencimiento = datetime.utcnow() + timedelta(days=14)
-
-        db.commit()
-        db.refresh(caso)
-
-        return caso
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error generando documento: {str(e)}"
-        )
+    return caso
 
 
 @router.post("/{caso_id}/desbloquear-admin")
@@ -1286,6 +1304,41 @@ async def solicitar_reembolso(
 
         # Guardar archivo de evidencia (si se proporcionó)
         if evidencia and evidencia.filename:
+            MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+
+            ALLOWED_MAGIC = {
+                b'\x25\x50\x44\x46': ['.pdf'],           # PDF (%PDF)
+                b'\xff\xd8\xff':      ['.jpg', '.jpeg'],  # JPEG
+                b'\x89\x50\x4e\x47': ['.png'],            # PNG
+            }
+
+            content = await evidencia.read()
+
+            if len(content) > MAX_FILE_SIZE:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="El archivo no puede superar 10 MB"
+                )
+
+            detected_exts = None
+            for magic, exts in ALLOWED_MAGIC.items():
+                if content.startswith(magic):
+                    detected_exts = exts
+                    break
+
+            if not detected_exts:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Tipo de archivo no permitido. Solo se aceptan PDF, JPG y PNG"
+                )
+
+            ext = os.path.splitext(evidencia.filename)[1].lower()
+            if ext not in detected_exts:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="La extensión del archivo no corresponde con su contenido"
+                )
+
             upload_dir = "uploads/evidencias_reembolso"
             os.makedirs(upload_dir, exist_ok=True)
 
@@ -1297,7 +1350,6 @@ async def solicitar_reembolso(
 
             # Guardar archivo
             with open(file_path, "wb") as buffer:
-                content = await evidencia.read()
                 buffer.write(content)
 
             evidencia_url = f"/{file_path}"

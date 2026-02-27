@@ -77,6 +77,17 @@ try:
             else:
                 print(f"    Columna '{col_name}' ya existe")
 
+        # ENUM estadocaso — agregar valores nuevos si no existen
+        print("\n  Verificando enum 'estadocaso'...")
+        nuevos_valores_enum = ["GENERANDO", "ERROR_GENERACION"]
+        for valor in nuevos_valores_enum:
+            try:
+                conn.execute(text(f"ALTER TYPE estadocaso ADD VALUE IF NOT EXISTS '{valor}'"))
+                conn.commit()
+                print(f"    [OK] Valor '{valor}' verificado/agregado al enum estadocaso")
+            except Exception as enum_err:
+                print(f"    [WARN] No se pudo agregar '{valor}' al enum: {enum_err}")
+
     print()
     print("=" * 70)
     print("[OK] COLUMNAS AGREGADAS EXITOSAMENTE")

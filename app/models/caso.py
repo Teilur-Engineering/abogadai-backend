@@ -13,7 +13,9 @@ class TipoDocumento(str, enum.Enum):
 
 class EstadoCaso(str, enum.Enum):
     TEMPORAL = "TEMPORAL"  # Sesión activa, conversando con avatar
+    GENERANDO = "GENERANDO"  # Generando documento con IA (proceso background)
     GENERADO = "GENERADO"  # Documento creado, esperando pago
+    ERROR_GENERACION = "ERROR_GENERACION"  # Falló la generación, se puede reintentar
     PAGADO = "PAGADO"  # Documento desbloqueado
     REEMBOLSADO = "REEMBOLSADO"  # Pago reembolsado
     # Estados legacy (mantener por compatibilidad)
