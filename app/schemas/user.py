@@ -55,6 +55,7 @@ class UserResponse(UserBase):
     perfil_completo: bool
     is_active: bool
     is_admin: bool
+    email_verified: bool
     created_at: datetime
 
     class Config:
@@ -75,6 +76,10 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
 
 
 class ForgotPasswordRequest(BaseModel):

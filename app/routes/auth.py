@@ -1,8 +1,8 @@
 import secrets
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -15,22 +15,32 @@ from app.core.security import (
 from app.core.config import settings
 from app.models.user import User
 from app.schemas.user import (
-    UserCreate, UserLogin, UserResponse, Token,
-    ForgotPasswordRequest, ResetPasswordRequest
+    UserCreate, UserLogin, UserResponse,
+    ForgotPasswordRequest, ResetPasswordRequest, ResendVerificationRequest
 )
-from app.services.email_service import enviar_email_reset_contrasena
+from app.services.email_service import enviar_email_reset_contrasena, enviar_email_verificacion
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
-security = HTTPBearer()
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
     db: Session = Depends(get_db)
 ) -> User:
-    token = credentials.credentials
-    payload = decode_access_token(token)
+    # Read token from cookie first, then Bearer header as fallback (for agent)
+    token = request.cookies.get('access_token')
+    if not token:
+        auth_header = request.headers.get('Authorization')
+        if auth_header and auth_header.startswith('Bearer '):
+            token = auth_header[7:]
 
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="No autenticado",
+        )
+
+    payload = decode_access_token(token)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,9 +64,8 @@ def get_current_user(
     return user
 
 
-@router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-def signup(user_data: UserCreate, db: Session = Depends(get_db)):
-    # Verificar si el usuario ya existe
+@router.post("/signup", status_code=status.HTTP_201_CREATED)
+async def signup(user_data: UserCreate, db: Session = Depends(get_db)):
     existing_user = db.query(User).filter(User.email == user_data.email).first()
     if existing_user:
         raise HTTPException(
@@ -64,25 +73,36 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="El email ya está registrado"
         )
 
-    # Crear nuevo usuario
     hashed_password = get_password_hash(user_data.password)
+    verification_token = secrets.token_urlsafe(32)
     new_user = User(
         email=user_data.email,
         nombre=user_data.nombre,
         apellido=user_data.apellido,
-        hashed_password=hashed_password
+        hashed_password=hashed_password,
+        email_verified=False,
+        email_verification_token=verification_token,
+        email_verification_expires=datetime.utcnow() + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)
     )
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
 
-    return new_user
+    try:
+        await enviar_email_verificacion(
+            email_destino=new_user.email,
+            nombre=new_user.nombre,
+            token=verification_token
+        )
+    except Exception:
+        pass
+
+    return {"message": "Cuenta creada. Revisa tu email para verificar."}
 
 
-@router.post("/login", response_model=Token)
-def login(user_data: UserLogin, db: Session = Depends(get_db)):
-    # Buscar usuario
+@router.post("/login")
+def login(user_data: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == user_data.email).first()
 
     if not user or not verify_password(user_data.password, user.hashed_password):
@@ -97,19 +117,92 @@ def login(user_data: UserLogin, db: Session = Depends(get_db)):
             detail="Usuario inactivo"
         )
 
-    # Crear token
+    if not user.email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="EMAIL_NOT_VERIFIED"
+        )
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email},
         expires_delta=access_token_expires
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        samesite=settings.COOKIE_SAMESITE,
+        secure=settings.COOKIE_SECURE,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/"
+    )
+
+    return {"message": "Login exitoso"}
 
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie(key="access_token", path="/")
+    return {"message": "Sesión cerrada"}
+
+
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    user = db.query(User).filter(
+        User.email_verification_token == token
+    ).first()
+
+    token_invalido = (
+        user is None
+        or user.email_verification_expires is None
+        or datetime.utcnow() > user.email_verification_expires
+    )
+
+    if token_invalido:
+        if user:
+            user.email_verification_token = None
+            user.email_verification_expires = None
+            db.commit()
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?verificado=error")
+
+    user.email_verified = True
+    user.email_verification_token = None
+    user.email_verification_expires = None
+    db.commit()
+
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/login?verificado=true")
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification(
+    request_data: ResendVerificationRequest,
+    db: Session = Depends(get_db)
+):
+    user = db.query(User).filter(User.email == request_data.email).first()
+
+    if user and user.is_active and not user.email_verified:
+        token = secrets.token_urlsafe(32)
+        user.email_verification_token = token
+        user.email_verification_expires = datetime.utcnow() + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)
+        db.commit()
+
+        try:
+            await enviar_email_verificacion(
+                email_destino=user.email,
+                nombre=user.nombre,
+                token=token
+            )
+        except Exception:
+            pass
+
+    return {"message": "Si el email está registrado y sin verificar, recibirás un nuevo enlace de verificación"}
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)

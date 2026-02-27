@@ -13,6 +13,7 @@ class Settings(BaseSettings):
 
     # CORS
     FRONTEND_URL: str = "http://localhost:5173"
+    BACKEND_URL: str = "http://localhost:8000"
 
     # Server
     PORT: int = 8000
@@ -37,6 +38,13 @@ class Settings(BaseSettings):
     VITA_X_LOGIN: Optional[str] = None  # Hash hexadecimal del business (para firmas)
     VITA_WALLET_MASTER_UUID: Optional[str] = None  # UUID de la wallet maestra
     VITA_ENVIRONMENT: str = "sandbox"  # sandbox | production
+
+    # Email verification
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+
+    # Cookie settings
+    COOKIE_SECURE: bool = False
+    COOKIE_SAMESITE: str = "lax"
 
     # Email / SMTP (para recuperación de contraseña)
     SMTP_HOST: Optional[str] = None

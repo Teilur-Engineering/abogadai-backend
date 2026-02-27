@@ -24,6 +24,11 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Verificación de email
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verification_token = Column(String(255), nullable=True, index=True)
+    email_verification_expires = Column(DateTime, nullable=True)
+
     # Recuperación de contraseña
     reset_password_token = Column(String(255), nullable=True, index=True)
     reset_token_expires = Column(DateTime, nullable=True)

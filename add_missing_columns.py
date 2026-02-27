@@ -37,6 +37,10 @@ try:
             ("sesiones_extra_hoy", "INTEGER DEFAULT 0 NOT NULL"),
             ("reset_password_token", "VARCHAR(255) NULL"),
             ("reset_token_expires", "TIMESTAMP NULL"),
+            # Email verification (existing users auto-verified = TRUE)
+            ("email_verified", "BOOLEAN DEFAULT TRUE NOT NULL"),
+            ("email_verification_token", "VARCHAR(255) NULL"),
+            ("email_verification_expires", "TIMESTAMP NULL"),
         ]
 
         for col_name, col_def in columnas_users:
